@@ -24,11 +24,11 @@ import pysteps as stp
 
 # Verification settings
 verification = {
-    "experiment_name"   : "cascade_mask_bps",
+    "experiment_name"   : "new_cascade_mask_bps",
     "overwrite"         : False,            # to recompute nowcasts
-    "v_thresholds"      : [.1, 2., 10.],    # [mm/h]
+    "v_thresholds"      : [.1, 2., 5.],    # [mm/h]
     "v_leadtimes"       : [60,120],         # [min]
-    "v_accu"            : 60,               # [min]
+    "v_accu"            : 5,               # [min]
     "seed"              : 42,               # for reproducibility
     "doplot"            : True,             # save figures
     "dosaveresults"     : True              # save verification scores to csv
@@ -49,16 +49,16 @@ forecast = {
 data_source = "mch_aqc"
 time_step_min = 120
 events = [("201604161800", "201604170600", time_step_min,       data_source)]
-events = [("201604161800", "201604170600", time_step_min,       data_source),
-          ("201607111300", "201607120100", time_step_min,       data_source),
-          ("201701311000", "201701312200", time_step_min,       data_source),
-          ("201706141300", "201706150100", time_step_min,       data_source),
-          ("201706242200", "201706251000", time_step_min,       data_source),
-          ("201706272000", "201706280800", time_step_min,       data_source),
-          ("201707191300", "201707200100", time_step_min,       data_source),
-          ("201707211300", "201707220100", time_step_min,       data_source),
-          ("201707291300", "201707300100", time_step_min,       data_source),
-          ("201708311400", "201709010200", time_step_min,       data_source)]
+# events = [("201604161800", "201604170600", time_step_min,       data_source),
+          # ("201607111300", "201607120100", time_step_min,       data_source),
+          # ("201701311000", "201701312200", time_step_min,       data_source),
+          # ("201706141300", "201706150100", time_step_min,       data_source),
+          # ("201706242200", "201706251000", time_step_min,       data_source),
+          # ("201706272000", "201706280800", time_step_min,       data_source),
+          # ("201707191300", "201707200100", time_step_min,       data_source),
+          # ("201707211300", "201707220100", time_step_min,       data_source),
+          # ("201707291300", "201707300100", time_step_min,       data_source),
+          # ("201708311400", "201709010200", time_step_min,       data_source)]
           
 # read data quality
 badts2016 = np.loadtxt("/store/msrad/radar/precip_attractor/radar_availability/AQC-2016_radar-stats-badTimestamps_00005.txt", dtype="str")
@@ -86,12 +86,19 @@ experiment = {
     "n_ens_members"     : [24],
     "ar_order"          : [2],
     "n_cascade_levels"  : [1,8],
-    "precip_mask"       : [True, False],
-    "mask_method"       : ["incremental"],      # obs, incremental, sprog
+    "mask_method"       : ["incremental", None], # obs, incremental, sprog, None
     "prob_matching"     : ["cdf"],
     "shift_and_scale"   : [False],
     "vel_pert_method"   : [motion_pert]
 }
+
+# Set the BPS motion perturbation parameters that are adapted to the Swiss domain
+if motion_pert == "bps":
+    print("Using Swiss parameters for motion perturbation.")
+    vel_pert_kwargs = {"p_pert_par":(2.56,0.33,-3.0), "p_pert_perp":(1.31,0.36,-1.02)}
+else:
+    print("Using default parameters for motion perturbation.")
+    vel_pert_kwargs = {} # Will use the default parameters
 
 # Conditional parameters
 ## parameters that can be directly related to other parameters
@@ -218,7 +225,7 @@ for n, parset in enumerate(parsets):
 
 
                 ## read radar field files
-                importer    = stp.io.get_method(ds.importer, type="importer")
+                importer    = stp.io.get_method(ds.importer, "importer")
                 R, _, metadata = stp.io.read_timeseries(input_files, importer, **ds.importer_kwargs)
                 metadata0 = metadata.copy()
                 metadata0["shape"] = R.shape[1:]
@@ -296,7 +303,7 @@ for n, parset in enumerate(parsets):
                             probmatching_method=p["prob_matching"],
                             mask_method=p["mask_method"],
                             vel_pert_method=p["vel_pert_method"],
-                            callback=export, return_output=False, seed=p["seed"])                   
+                            callback=export, return_output=False, seed=p["seed"], vel_pert_kwargs=vel_pert_kwargs)                   
 
                     ## save results
                     stp.io.close_forecast_file(exporter)
@@ -346,7 +353,7 @@ for n, parset in enumerate(parsets):
                                               ds.fn_ext, ds.timestep, 0, p["n_lead_times"])
 
             ## read radar field files
-            importer = stp.io.get_method(ds.importer, type="importer")
+            importer = stp.io.get_method(ds.importer, "importer")
             R_obs, _, metadata_obs = stp.io.read_timeseries(input_files, importer, **ds.importer_kwargs)
             R_obs = R_obs[1:,:,:]
             metadata_obs["timestamps"] = metadata_obs["timestamps"][1:]
