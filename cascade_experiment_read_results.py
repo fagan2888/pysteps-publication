@@ -8,18 +8,18 @@ from pysteps.verification import ensscores
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
 # Data dir
-experiment_name = "cascade_mask"
+experiment_name = "new_cascade_mask_bps"
 base_dir = "/scratch/lforesti/pysteps-data/output/" + experiment_name
-fig_dir_out = "/users/lforesti/pysteps/figures"
+fig_dir_out = "/users/lforesti/pysteps-publication/figures"
 
 # Experiment parameters
 cascade_levels = [1,8]
-precip_mask = [True,False]
+mask_method = ['incremental', None]
 
-thrs_rel = [0.1, 2, 10]
+thrs_rel = [0.1, 2, 5]
 thrs_rk = [0.1]
 v_leadtimes = [60,120]
-v_accum = 60
+v_accum = 5
 
 # Plot parameters
 cols = ["C3", "C1", "C0", "C2"]
@@ -45,12 +45,12 @@ for v_leadtime in v_leadtimes:
 
         w = 0
         # LOOP over experiments
-        for p in precip_mask:
+        for p in mask_method:
             for c in cascade_levels:
                 
                 # Read-in rank histogram file
                 rankhists[w] = {}
-                fn = base_dir + '/n_cascade_levels-%i/precip_mask-%s/rankhist_%03i_%03i_thr%.1f.csv' % (c,p,v_leadtime,v_accum,thr)
+                fn = base_dir + '/n_cascade_levels-%i/mask_method-%s/rankhist_%03i_%03i_thr%.1f.csv' % (c,p,v_leadtime,v_accum,thr)
                 
                 with open(fn, 'r') as csvfile:
                     reader = csv.reader(csvfile)
@@ -69,7 +69,7 @@ for v_leadtime in v_leadtimes:
                 # Plot rank histogram
                 if w==0:
                     plt.plot(x, np.ones_like(x)*1/x.size, ":k")
-                if p:
+                if p is not None:
                     p_label = 'with mask'
                 else:
                     p_label = 'without mask'
@@ -106,12 +106,12 @@ for v_leadtime in v_leadtimes:
 
         w = 0
         # LOOP over experiments
-        for p in precip_mask:
+        for p in mask_method:
             for c in cascade_levels:
             
                 # Read-in reliability file
                 reldiags[w] = {}
-                fn = base_dir + '/n_cascade_levels-%i/precip_mask-%s/reldiag_%03i_%03i_thr%.1f.csv' % (c,p,v_leadtime,v_accum,thr)
+                fn = base_dir + '/n_cascade_levels-%i/mask_method-%s/reldiag_%03i_%03i_thr%.1f.csv' % (c,p,v_leadtime,v_accum,thr)
                 print(fn)
                 with open(fn, 'r') as csvfile:
                     reader = csv.reader(csvfile)
@@ -131,7 +131,7 @@ for v_leadtime in v_leadtimes:
                 if w == 0:
                     ax = plt.gca()
                 
-                if p:
+                if p is not None:
                     p_label = 'with mask'
                 else:
                     p_label = 'without mask'
