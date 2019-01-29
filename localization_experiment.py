@@ -44,16 +44,16 @@ forecast = {
 # Events   event start     event end       update cycle  data source
 data_source = "mch_rzc"
 time_step_min = 120
-events = [("201604161800", "201604170600", time_step_min,       data_source),
-          ("201607111300", "201607120100", time_step_min,       data_source),
-          ("201701311000", "201701312200", time_step_min,       data_source),
-          ("201706141300", "201706150100", time_step_min,       data_source),
-          ("201706242200", "201706251000", time_step_min,       data_source),
-          ("201706272000", "201706280800", time_step_min,       data_source),
-          ("201707191300", "201707200100", time_step_min,       data_source),
-          ("201707211300", "201707220100", time_step_min,       data_source),
-          ("201707291300", "201707300100", time_step_min,       data_source),
-          ("201708311400", "201709010200", time_step_min,       data_source)]
+events = [("201604161800", "201604170600", time_step_min, data_source),
+          ("201607111300", "201607120100", time_step_min, data_source),
+          ("201701311000", "201701312200", time_step_min, data_source),
+          ("201706141300", "201706150100", time_step_min, data_source),
+          ("201706242200", "201706251000", time_step_min, data_source),
+          ("201706272000", "201706280800", time_step_min, data_source),
+          ("201707191300", "201707200100", time_step_min, data_source),
+          ("201707211300", "201707220100", time_step_min, data_source),
+          ("201707291300", "201707300100", time_step_min, data_source),
+          ("201708311400", "201709010200", time_step_min, data_source)]
 
 # read data quality
 badts2016 = np.loadtxt("/store/msrad/radar/precip_attractor/radar_availability/AQC-2016_radar-stats-badTimestamps_00005.txt", dtype="str")
@@ -74,14 +74,12 @@ experiment = {
     "decomp_method" : ["fft"],
 
     ## the parameters
-    # "win_size" : [710, 256, 128, 64],
     "win_size" : [710, 256, 128, 64],
     "n_ens_members" : [24],
     "ar_order" : [2],
     "n_cascade_levels" : [8],
     "mask_method" : ["incremental"],      # obs, incremental, sprog
     "probmatching_method" : ["cdf"],
-    "shift_and_scale" : [False],
     "vel_pert_method" : ["bps"]
 }
 
@@ -108,7 +106,7 @@ def cond_pars(pars):
             if pars[key] == "extrapolation" : pars["n_ens_members"] = 1
     return pars
 
-# Prepare the list of all parameter sets of the verification
+# Prepare the list of all parameter sets
 parsets = [[]]
 for _, items in experiment.items():
     parsets = [parset+[item] for parset in parsets for item in items]
@@ -290,7 +288,6 @@ for n, parset in enumerate(parsets):
                             ar_order=p["ar_order"],
                             probmatching_method=p["probmatching_method"],
                             mask_method=p["mask_method"],
-                            shift_and_scale=p["shift_and_scale"],
                             vel_pert_method=p["vel_pert_method"],
                             transformation=transformer,
                             callback=export, return_output=False, seed=p["seed"],
@@ -298,12 +295,6 @@ for n, parset in enumerate(parsets):
 
                     # save results
                     stp.io.close_forecast_file(exporter)
-
-                    # except:
-                        # print("Run failed.")
-                        # stp.io.close_forecast_file(exporter)
-                        # os.remove(outfn)
-
 
                 else:
                     print("Run aborted.")
