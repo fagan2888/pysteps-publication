@@ -1,0 +1,199 @@
+### MATPLOTLIBRC FORMAT
+
+#### CONFIGURATION BEGINS HERE
+
+# The default backend; one of GTK GTKAgg GTKCairo GTK3Agg GTK3Cairo
+# MacOSX Qt4Agg Qt5Agg TkAgg WX WXAgg Agg Cairo GDK PS PDF SVG
+# Template.
+# You can also deploy your own backend outside of matplotlib by
+# referring to the module name (which must be in the PYTHONPATH) as
+# 'module://my_backend'.
+backend      : Qt5Agg
+
+
+### LINES
+# See http://matplotlib.org/api/artist_api.html#module-matplotlib.lines for more
+# information on line properties.
+#lines.linewidth   : 1.5     # line width in points
+#lines.markersize  : 6            # markersize, in points
+lines.antialiased : True         # render lines in antialiased (no jaggies)
+
+# The three standard dash patterns.  These are scaled by the linewidth.
+lines.dashed_pattern : 5,2
+
+### PATCHES
+# Patches are graphical objects that fill 2D space, like polygons or
+# circles.  See
+# http://matplotlib.org/api/artist_api.html#module-matplotlib.patches
+# information on patch properties
+patch.antialiased      : True    # render patches in antialiased (no jaggies)
+
+
+### FONT
+#
+# font properties used by text.Text.  See
+# http://matplotlib.org/api/font_manager_api.html for more
+# information on font properties.  The 6 font properties used for font
+# matching are given below with their default values.
+#
+# The font.family property has five values: 'serif' (e.g., Times),
+# 'sans-serif' (e.g., Helvetica), 'cursive' (e.g., Zapf-Chancery),
+# 'fantasy' (e.g., Western), and 'monospace' (e.g., Courier).  Each of
+# these font families has a default list of font names in decreasing
+# order of priority associated with them.  When text.usetex is False,
+# font.family may also be one or more concrete font names.
+#
+# The font.style property has three values: normal (or roman), italic
+# or oblique.  The oblique style will be used for italic, if it is not
+# present.
+#
+# The font.variant property has two values: normal or small-caps.  For
+# TrueType fonts, which are scalable fonts, small-caps is equivalent
+# to using a font size of 'smaller', or about 83%% of the current font
+# size.
+#
+# The font.weight property has effectively 13 values: normal, bold,
+# bolder, lighter, 100, 200, 300, ..., 900.  Normal is the same as
+# 400, and bold is 700.  bolder and lighter are relative values with
+# respect to the current weight.
+#
+# The font.stretch property has 11 values: ultra-condensed,
+# extra-condensed, condensed, semi-condensed, normal, semi-expanded,
+# expanded, extra-expanded, ultra-expanded, wider, and narrower.  This
+# property is not currently implemented.
+#
+# The font.size property is the default font size for text, given in pts.
+# 10 pt is the standard value.
+#
+font.family         : sans-serif
+font.sans-serif      : Arial, DejaVu Serif
+
+#font.style          : normal
+#font.variant        : normal
+#font.weight         : medium
+#font.stretch        : normal
+
+# note that font.size controls default text sizes.  To configure
+# special text sizes tick labels, axes, labels, title, etc, see the rc
+# settings for axes and ticks. Special text sizes can be defined
+# relative to font.size, using the following values: xx-small, x-small,
+# small, medium, large, x-large, xx-large, larger, or smaller
+font.size            : 12.0
+
+### AXES
+# default face and edge color, default tick sizes,
+# default fontsizes for ticklabels, and so on.  See
+# http://matplotlib.org/api/axes_api.html#module-matplotlib.axes
+
+axes.facecolor      : white   # axes background color
+axes.edgecolor      : black   # axes edge color
+axes.linewidth      : 1.5     # edge linewidth
+axes.grid           : True    # display grid or not
+
+#axes.titlesize      : 13.0    # fontsize of the axes title
+#axes.titlepad       : 3.0     # pad between axes and title in points
+axes.labelsize       : 12.0     # fontsize of the x any y labels
+#axes.labelpad       : 4.0     # space between label and axis
+#axes.labelweight    : normal  # weight of the x and y labels
+#axes.labelcolor     : black
+#axes.axisbelow      : 'line'  # draw axis gridlines and ticks below
+                               # patches (True); above patches but below
+                               # lines ('line'); or above all (False)
+
+
+# axes.spines.left   : True   # display axis spines
+# axes.spines.bottom : True
+# axes.spines.top    : True
+# axes.spines.right  : True
+
+axes.autolimit_mode : data  # How to scale axes limits to the data.
+                            # Use "data" to use data limits, plus some margin
+                            # Use "round_number" move to the nearest "round" number
+
+#axes.xmargin        : .01  # x margin.  See `axes.Axes.margins`
+#axes.ymargin        : .01  # y margin See `axes.Axes.margins`
+
+#polaraxes.grid      : True    # display grid on polar axes
+#axes3d.grid         : True    # display grid on 3d axes
+
+### TICKS
+# see http://matplotlib.org/api/axis_api.html#matplotlib.axis.Tick
+xtick.major.size     : 4      # major tick size in points
+xtick.minor.size     : 2      # minor tick size in points
+xtick.major.width    : 1.5    # major tick width in points
+xtick.minor.width    : 1.0    # minor tick width in points
+xtick.major.pad      : 3      # distance to major tick label in points
+xtick.minor.pad      : 2      # distance to the minor tick label in points
+xtick.labelsize      : 12     # fontsize of the tick labels
+
+ytick.major.size     : 4      # major tick size in points
+ytick.minor.size     : 2      # minor tick size in points
+ytick.major.width    : 1.5    # major tick width in points
+ytick.minor.width    : 1.0    # minor tick width in points
+ytick.major.pad      : 3      # distance to major tick label in points
+ytick.minor.pad      : 2      # distance to the minor tick label in points
+ytick.labelsize      : 12     # fontsize of the tick labels
+
+
+### GRIDS
+#grid.color       :   b0b0b0    # grid color
+#grid.linestyle   :   -         # solid
+#grid.linewidth   :   0.8       # in points
+#grid.alpha       :   1.0       # transparency, between 0.0 and 1.0
+
+### Legend
+#legend.loc           : best
+#legend.frameon       : True     # if True, draw the legend on a background patch
+#legend.framealpha    : 0.8      # legend patch transparency
+legend.facecolor     : None    # inherit from axes.facecolor; or color spec
+legend.edgecolor     : None     # background patch boundary color
+legend.fancybox      : False     # if True, use a rounded box for the
+                                 # legend background, else a rectangle
+
+#legend.fontsize      : medium
+# Dimensions as fraction of fontsize:
+#legend.borderpad     : 0.4      # border whitespace
+#legend.labelspacing  : 0.5      # the vertical space between the legend entries
+#legend.handlelength  : 2.0      # the length of the legend lines
+#legend.handleheight  : 0.7      # the height of the legend handle
+legend.handletextpad  : 0.6      # the space between the legend line and legend text
+#legend.borderaxespad : 0.5      # the border between the axes and legend edge
+legend.columnspacing : 0.8      # column separation
+
+### FIGURE
+figure.figsize   : 7,5   # figure size in inches
+figure.dpi       : 150   # figure dots per inch
+
+# The figure subplot parameters.  All dimensions are a fraction of the
+figure.subplot.left    : 0.1  # the left side of the subplots of the figure
+figure.subplot.right   : 0.95   # the right side of the subplots of the figure
+figure.subplot.bottom  : 0.15   # the bottom of the subplots of the figure
+figure.subplot.top     : 0.92   # the top of the subplots of the figure
+figure.subplot.wspace  : 0.2    # the amount of width reserved for blank space between subplots,
+                                # expressed as a fraction of the average axis width
+figure.subplot.hspace  : 0.2    # the amount of height reserved for white space between subplots,
+                                # expressed as a fraction of the average axis height
+
+
+# the default savefig params can be different from the display params
+# e.g., you may want a higher resolution, or to make the figure
+# background white
+savefig.dpi         : figure   # figure dots per inch or 'figure'
+#savefig.facecolor   : white    # figure facecolor when saving
+#savefig.edgecolor   : white    # figure edgecolor when saving
+#savefig.format      : png      # png, ps, pdf, svg
+#savefig.bbox        : standard # 'tight' or 'standard'.
+                                # 'tight' is incompatible with pipe-based animation
+                                # backends but will workd with temporary file based ones:
+                                # e.g. setting animation.writer to ffmpeg will not work,
+                                # use ffmpeg_file instead
+#savefig.pad_inches  : 0.1      # Padding to be used when bbox is set to 'tight'
+#savefig.jpeg_quality: 95       # when a jpeg is saved, the default quality parameter.
+#savefig.directory   : ~        # default directory in savefig dialog box,
+                                # leave empty to always use current working directory
+#savefig.transparent : False    # setting that controls whether figures are saved with a
+                                # transparent background by default
+
+ps.fonttype       : 42       # Output Type 3 (Type3) or Type 42 (TrueType)
+pdf.fonttype      : 42         # Output Type 3 (Type3) or Type 42 (TrueType)
+
