@@ -1,6 +1,16 @@
-# Runs SSEPS with different window sizes and computes probabilistic 
-# verification statistics with different intensity thresholds
+"""
+Section 6.3
+This experiment investigates the impact of localization on the quality  of  the  
+nowcast.  For  localization  we  intend  the  use of  a  subset  of  the  
+observations  in  order  to  estimate  model parameters that are distributed in 
+space. The short-space approach used in Nerini et al. (2017) is generalized to 
+the whole nowcasting system. This essenially boils down to a moving window 
+localization of the nowcasting procedure, whereby all parameters are estimated 
+over a subdomain of prescribed size.
 
+This script runs the nowcasts and produces the verification results for a set
+of localization windows.
+"""
 import dask
 from datetime import datetime, timedelta
 import numpy as np
@@ -27,8 +37,6 @@ R_thrs = [0.1, 1.0, 5.0, 10.0]
 datasource = datasources.mch_rzc
 precipevents = precipevents.mch
 
-# vp_par  = (2.56338484, 0.3330941, -2.99714349) # mch only
-# vp_perp = (1.31204508, 0.3578426, -1.02499891)
 vp_par  = (2.31970635, 0.33734287, -2.64972861) # fmi+mch
 vp_perp = (1.90769947, 0.33446594, -2.06603662)
 
