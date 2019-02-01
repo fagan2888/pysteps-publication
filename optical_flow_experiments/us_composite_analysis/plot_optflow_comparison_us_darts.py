@@ -8,6 +8,7 @@ then aggregated using the script aggregate_optflow_comparison_us_darts.py
 The data is stored in ./data/darts_tests folder.
 
 """
+import numpy
 from os import makedirs
 from os.path import join, isdir
 
@@ -120,6 +121,44 @@ if __name__ == "__main__":
     i = 0
 
     for ncm in nowcast_methods:
+
+        file_name_pattern = join("./data/optflow_comparison/us",
+                                 "optflow_comparison_results_{}_us.dat")
+
+        file_name = file_name_pattern.format(ncm)
+
+
+        with open(file_name, "rb") as f:
+            results = pickle.load(f)
+
+        n_samples = numpy.asarray(
+            results['vet']["n_samples"])
+
+        vet_csi = numpy.asarray(
+            results['vet']['CSI']) / n_samples
+
+
+        leadtimes = (numpy.arange(len(vet_csi)) + 1) * 5
+
+        ax_csi.plot(leadtimes, vet_csi,
+                color='k',
+                marker=markers[ncm],
+                label=ncm + "/ VET",
+                linewidth=2,
+                markersize=6)
+
+        vet_mae = numpy.asarray(
+            results['vet']['RMSE']) / n_samples
+
+
+        ax_rmse.plot(leadtimes, vet_mae,
+                    color='k',
+                    marker=markers[ncm],
+                    label="VET",
+                    linewidth=2,
+                    markersize=6)
+
+
         for config_number in config_to_plot:
             color = colors[(i - 1) % len(config_to_plot)]
             data_dir = './data/darts_tests/config_{:d}'.format(config_number)
@@ -156,7 +195,7 @@ if __name__ == "__main__":
 
     # ax_csi.set_ylim(0.35, 0.9)
 
-    ax_rmse.legend(loc=4, fontsize=12)
+    ax_rmse.legend(loc=4, fontsize=12,ncol=2)
     ax_rmse.set_xlabel("Lead time (minutes)", fontsize=12)
     ax_rmse.set_ylabel("MAE", fontsize=12)
     ax_rmse.grid(True)
