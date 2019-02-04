@@ -1,7 +1,5 @@
 #!/bin/env python
 
-#!/bin/env python
-
 """
 Cascade experiment analysis precipitation field plots:
 Pysteps ensembles are generated with/without cascade decomposition and with/without precipitation mask.
@@ -21,14 +19,15 @@ import time
 import pysteps as stp
 
 # Precipitation events
-data_source   = "mch_aqc"
-events = ["201701311000", "201701312200"]
+data_source   = "mch_hdf5"
+events = ["201701311000", "201607111300"]
 
 # Whether to analyze the rainfall accumulations or the final rainrate fields
-accumulation = False
+accumulation        = False
+adv_method          = "eulerian"  # semilagrangian, eulerian
 
 # Plot parameters          
-out_dir_figs= "/users/lforesti/pysteps-publication/figures/"
+out_dir_figs= "figures/"
 fig_fmt = 'png'
 dpi = 300
 cartopy_scale = "10m"
@@ -37,22 +36,23 @@ cols = ["C3", "C1", "C0", "C2"]
 ## Methods
 oflow_method        = "lucaskanade"     # lucaskanade, darts, None
 nwc_method          = "steps"
-adv_method          = "eulerian"  # semilagrangian, eulerian
 noise_method        = "nonparametric"   # parametric, nonparametric, ssft
 bandpass_filter     = "gaussian"
 decomp_method       = "fft"
 
 ## Forecast parameters
+n_cascade_levels_l  = [1,8]
+mask_method_l       = ['incremental', None]     # sprog, obs or incremental
+
 n_prvs_times        = 3                 # use at least 9 with DARTS
 n_lead_times        = 12
 n_ens_members       = 24
-n_cascade_levels_l  = [1,8]
 ar_order            = 2
 r_threshold         = 0.1               # rain/no-rain threshold [mm/h]
 zero_value_dbr      = -15
 adjust_noise        = None              # Whether to adjust the noise fo the cascade levels
 prob_matching       = "cdf"
-mask_method_l       = ['incremental', None]     # sprog, obs or incremental
+
 conditional         = False
 motion_pert         = 'bps'
 unit                = "mm/h"            # mm/h or dBZ
@@ -182,8 +182,7 @@ for startdate_str in events:
     R_obs_accum_ps = to_dB(R_obs_accum, metadata_obs)[0]
     
     # Remove rain/no-rain transition
-    R_obs_accum_ps[R_obs_accum_ps > R_obs_accum_ps.min()] -= (R_obs_accum_ps[R_obs_accum_ps > R_obs_accum_ps.min()].min() - R_obs_accum_ps.min())
-    R_obs_accum_ps -= R_obs_accum_ps.min()
+    R_obs_accum_ps = stp.utils.remove_rain_norain_discontinuity(R_obs_accum_ps)
     
     # Compute FFT spectrum of observed rainfall field
     R_obs_accum_spectrum, fft_freq = stp.utils.rapsd(R_obs_accum_ps, np.fft, return_freq=True, d=1.0)
@@ -245,8 +244,7 @@ for startdate_str in events:
                 R_fct_accum_ps = to_dB(R_fct_accum, metadata_fct)[0]
                 
                 # Remove rain/no-rain transition
-                R_fct_accum_ps[R_fct_accum_ps > R_fct_accum_ps.min()] -= (R_fct_accum_ps[R_fct_accum_ps > R_fct_accum_ps.min()].min() - R_fct_accum_ps.min())
-                R_fct_accum_ps -= R_fct_accum_ps.min()
+                R_fct_accum_ps = stp.utils.remove_rain_norain_discontinuity(R_fct_accum_ps)
     
                 if member == 0:
                     R_fct_accum_spectrum = stp.utils.rapsd(R_fct_accum_ps, np.fft, d=1.0)
