@@ -12,15 +12,16 @@ import pickle
 from pysteps.verification import ensscores, probscores
 
 # Parameters
-filename_verif = "data/cascade_results_accum60.dat"
+filename_verif = "data/cascade_results_rainrate.dat"
 
-fixedleadtimes = [0,1] # timesteps
+fixedleadtimes = [5,11] # timesteps for rainrate
+#fixedleadtimes = [0] # timesteps for 60 min accum
 minmaxleadtimes = [5, 90] # min
 R_thrs = [0.1, 1.0, 5.0, 10.0]
 
 # Plot parameters
 basename_figs = "cascade"
-fmt = "png"
+fmt = "pdf"
 ftsize_title = 16
 linecolors = ["C3", "C0", "C1", "C2", "C4", "C5", "C6"]
 linestyles = ['-', '-', '-', '-', '-']

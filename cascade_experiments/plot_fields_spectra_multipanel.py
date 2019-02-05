@@ -179,13 +179,13 @@ for startdate_str in events:
     
     # Compute the power spectra from the dBR field
     R_obs_accum[np.isnan(R_obs_accum)] = 0.0
-    R_obs_accum_ps = to_dB(R_obs_accum, metadata_obs)[0]
+    R_obs_accum = to_dB(R_obs_accum, metadata_obs)[0]
     
     # Remove rain/no-rain transition
-    R_obs_accum_ps = stp.utils.remove_rain_norain_discontinuity(R_obs_accum_ps)
+    R_obs_accum_shift = stp.utils.remove_rain_norain_discontinuity(R_obs_accum)
     
     # Compute FFT spectrum of observed rainfall field
-    R_obs_accum_spectrum, fft_freq = stp.utils.rapsd(R_obs_accum_ps, np.fft, return_freq=True, d=1.0)
+    R_obs_accum_spectrum, fft_freq = stp.utils.rapsd(R_obs_accum_shift, np.fft, return_freq=True, d=1.0)
     
     ax = plt.subplot(n_rows, n_cols, n_cols+1)
     lw = 1.0
@@ -241,15 +241,15 @@ for startdate_str in events:
                 R_fct_accum[R_fct_accum < r_threshold] = 0.0
                 
                 # Compute Fourier spectrum for each member
-                R_fct_accum_ps = to_dB(R_fct_accum, metadata_fct)[0]
+                R_fct_accum = to_dB(R_fct_accum, metadata_fct)[0]
                 
                 # Remove rain/no-rain transition
-                R_fct_accum_ps = stp.utils.remove_rain_norain_discontinuity(R_fct_accum_ps)
+                R_fct_accum_shift = stp.utils.remove_rain_norain_discontinuity(R_fct_accum)
     
                 if member == 0:
-                    R_fct_accum_spectrum = stp.utils.rapsd(R_fct_accum_ps, np.fft, d=1.0)
+                    R_fct_accum_spectrum = stp.utils.rapsd(R_fct_accum_shift, np.fft, d=1.0)
                 else:
-                    R_fct_accum_spectrum += stp.utils.rapsd(R_fct_accum_ps, np.fft, d=1.0)
+                    R_fct_accum_spectrum += stp.utils.rapsd(R_fct_accum_shift, np.fft, d=1.0)
             
             # Compute average Fourier spectrum
             R_fct_accum_spectrum /= n_ens_members 
