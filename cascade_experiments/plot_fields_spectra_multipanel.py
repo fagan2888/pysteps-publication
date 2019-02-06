@@ -10,13 +10,15 @@ The nowcast can be done in either Eulerian or Lagrangian frame. Nowcast accumula
 import datetime
 import matplotlib.pylab as plt
 import matplotlib
-# matplotlib.use('Agg')
+matplotlib.use('Agg')
 import numpy as np
 import pickle
 import os
 import sys
 import time
+
 import pysteps as stp
+from pysteps.noise.fftgenerators import build_2D_tapering_function
 
 # Precipitation events
 data_source   = "mch_hdf5"
@@ -60,9 +62,14 @@ transformation      = "dB"              # None or dB
 seed                = 42                # for reproducibility
 
 # Set the BPS motion perturbation parameters that are adapted to the Swiss domain
+# vp_par  = (2.56338484, 0.3330941, -2.99714349) # mch only
+# vp_perp = (1.31204508, 0.3578426, -1.02499891)
+vp_par  = (2.31970635, 0.33734287, -2.64972861) # fmi+mch
+vp_perp = (1.90769947, 0.33446594, -2.06603662)
+
 if motion_pert == "bps":
     print("Using Swiss parameters for motion perturbation.")
-    vel_pert_kwargs = {"p_pert_par":(2.56,0.33,-3.0), "p_pert_perp":(1.31,0.36,-1.02)}
+    vel_pert_kwargs = {"p_pert_par":vp_par, "p_pert_perp":vp_perp}
 else:
     print("Using default parameters for motion perturbation.")
     vel_pert_kwargs = {} # Will use the default parameters
@@ -179,10 +186,14 @@ for startdate_str in events:
     
     # Compute the power spectra from the dBR field
     R_obs_accum[np.isnan(R_obs_accum)] = 0.0
-    R_obs_accum = to_dB(R_obs_accum, metadata_obs)[0]
+    R_obs_accum_dbr = to_dB(R_obs_accum, metadata_obs)[0]
     
     # Remove rain/no-rain transition
-    R_obs_accum_shift = stp.utils.remove_rain_norain_discontinuity(R_obs_accum)
+    R_obs_accum_shift = stp.utils.remove_rain_norain_discontinuity(R_obs_accum_dbr)
+    
+    # Apply window function to reduce edge effects when rain touches the domain borders
+    window = build_2D_tapering_function(R_obs_accum_shift.shape, win_type='flat-hanning')
+    R_obs_accum_shift *= window
     
     # Compute FFT spectrum of observed rainfall field
     R_obs_accum_spectrum, fft_freq = stp.utils.rapsd(R_obs_accum_shift, np.fft, return_freq=True, d=1.0)
@@ -237,15 +248,19 @@ for startdate_str in events:
 
                 R_fct_accum[np.isnan(R_fct_accum)] = 0.0
                 
-                ## threshold the accumulations
+                ## Threshold the accumulations
                 R_fct_accum[R_fct_accum < r_threshold] = 0.0
                 
-                # Compute Fourier spectrum for each member
-                R_fct_accum = to_dB(R_fct_accum, metadata_fct)[0]
+                # Convert to dBR
+                R_fct_accum_dbr = to_dB(R_fct_accum, metadata_fct)[0]
                 
                 # Remove rain/no-rain transition
-                R_fct_accum_shift = stp.utils.remove_rain_norain_discontinuity(R_fct_accum)
-    
+                R_fct_accum_shift = stp.utils.remove_rain_norain_discontinuity(R_fct_accum_dbr)
+                
+                # Apply window
+                R_fct_accum_shift *= window
+                
+                # Compute Fourier spectrum for each member
                 if member == 0:
                     R_fct_accum_spectrum = stp.utils.rapsd(R_fct_accum_shift, np.fft, d=1.0)
                 else:
@@ -279,7 +294,7 @@ for startdate_str in events:
                     c+=1
                 # Decorate plot
                 ax.set_title('Fourier spectra', fontsize=title_ftsize)
-                ax.set_ylim([-20,60])
+                ax.set_ylim([-10,60])
                 plt.setp(ax.get_xticklabels(), fontsize=12)
                 plt.setp(ax.get_yticklabels(), fontsize=12)
                 ax.xaxis.label.set_size(14)
@@ -311,10 +326,7 @@ for startdate_str in events:
             print('Elapsed time for one parameter setting:', toc-tic)
     
     # Save plot
-    if accumulation:
-        figname = out_dir_figs + startdate_str + '_multipanel_' + adv_method + "_" + str(int(n_lead_times)*ds.timestep) + 'min_accumulation.' + fig_fmt
-    else:
-        figname = out_dir_figs + startdate_str + '_multipanel_' + adv_method + "_" + str(int(n_lead_times)*ds.timestep) + 'min_intensity.' + fig_fmt
+    figname = out_dir_figs + startdate_str + '_multipanel_' + adv_method + "_" + str(int(n_lead_times)*ds.timestep) + 'min_accumulation-' + str(accumulation) + '.' + fig_fmt
     plt.savefig(figname, dpi=dpi, bbox_inches='tight')
     print(figname, 'saved.')
     
