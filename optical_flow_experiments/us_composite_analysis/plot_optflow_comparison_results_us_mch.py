@@ -35,14 +35,14 @@ if __name__ == "__main__":
     markers = {"advection": 'o',
                "sprog": None}
 
-    metrics_units = {'CSI': "", 'MAE': ' [mm/hr]'}
+    metrics_units = {'CSI': "", 'MAE': ' [mm/h]'}
     # minimum lead time to plot (minutes)
     minleadtime = 5
 
     # maximum lead time to plot (minutes)
     maxleadtime = 120
-
-    pyplot.figure(figsize=(8, 6))
+    scale = 1.1
+    pyplot.figure(figsize=(8*scale, 5.5*scale))
 
     i = 0
     for metric in ['CSI', 'MAE']:
@@ -114,7 +114,7 @@ if __name__ == "__main__":
 
                 if i < 2:
                     ax.set_title("{} Events".format(domains_labels[_domain]),
-                                 fontsize=16, pad=10)
+                                 fontsize=14, pad=10)
 
             i += 1
 
