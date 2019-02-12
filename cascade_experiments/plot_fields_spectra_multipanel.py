@@ -1,10 +1,11 @@
 #!/bin/env python
 
 """
-Cascade experiment analysis precipitation field plots:
+Cascade experiment: analysis of realism of precipitation fields.
 Pysteps ensembles are generated with/without cascade decomposition and with/without precipitation mask.
 The nowcast fields are then plotted and analyzed using power spectra.
 The nowcast can be done in either Eulerian or Lagrangian frame. Nowcast accumulations can also be computed and analyzed.
+Beware when choosing eulerian: the AR parameters are estimated without advection.
 """
 
 import datetime
@@ -22,44 +23,36 @@ from pysteps.noise.fftgenerators import build_2D_tapering_function
 
 # Precipitation events
 data_source   = "mch_hdf5"
-events = ["201701311000", "201607111300"]
+events = ["201607111300","201701311000"]
 
 # Whether to analyze the rainfall accumulations or the final rainrate fields
 accumulation        = False
-adv_method          = "eulerian"  # semilagrangian, eulerian
 
-# Plot parameters          
-out_dir_figs= "figures/"
-fig_fmt = 'png'
-dpi = 300
-cartopy_scale = "10m"
-cols = ["C3", "C1", "C0", "C2"]
-
-## Methods
-oflow_method        = "lucaskanade"     # lucaskanade, darts, None
-nwc_method          = "steps"
-noise_method        = "nonparametric"   # parametric, nonparametric, ssft
-bandpass_filter     = "gaussian"
-decomp_method       = "fft"
-
-## Forecast parameters
+## Experiment parameters
 n_cascade_levels_l  = [1,8]
 mask_method_l       = ['incremental', None]     # sprog, obs or incremental
 
+## Methods
+oflow_method        = "lucaskanade"     # lucaskanade, darts, None
+adv_method          = "semilagrangian"  # semilagrangian, eulerian
+nwc_method          = "steps"
+noise_method        = "nonparametric"   # parametric, nonparametric, ssft
+
+## Forecast parameters
 n_prvs_times        = 3                 # use at least 9 with DARTS
 n_lead_times        = 12
 n_ens_members       = 24
 ar_order            = 2
 r_threshold         = 0.1               # rain/no-rain threshold [mm/h]
 zero_value_dbr      = -15
-adjust_noise        = None              # Whether to adjust the noise fo the cascade levels
+adjust_noise        = None              # whether to adjust the noise fo the cascade levels
 prob_matching       = "cdf"
-
 conditional         = False
+
 motion_pert         = 'bps'
 unit                = "mm/h"            # mm/h or dBZ
 transformation      = "dB"              # None or dB
-seed                = 42                # for reproducibility
+seed                = 24                # for reproducibility
 
 # Set the BPS motion perturbation parameters that are adapted to the Swiss domain
 # vp_par  = (2.56338484, 0.3330941, -2.99714349) # mch only
@@ -73,6 +66,13 @@ if motion_pert == "bps":
 else:
     print("Using default parameters for motion perturbation.")
     vel_pert_kwargs = {} # Will use the default parameters
+
+# Plot parameters          
+out_dir_figs= "figures/"
+fig_fmt = 'png'
+dpi = 300
+cartopy_scale = "10m"
+cols = ["C3", "C1", "C0", "C2"]    
 
 ## LOOP over precipitation events
 for startdate_str in events:
@@ -226,13 +226,11 @@ for startdate_str in events:
             ## Compute nowcast    
             R_fct = nwc(R, UV, n_lead_times, n_ens_members,
                                n_cascade_levels, kmperpixel=metadata["xpixelsize"]/1000,
-                               timestep=ds.timestep,  R_thr=metadata["threshold"],
-                               extrap_method=adv_method, decomp_method=decomp_method,
-                               bandpass_filter_method=bandpass_filter,
+                               timestep=ds.timestep, R_thr=metadata["threshold"],
+                               extrap_method=adv_method, bandpass_filter_method=bandpass_filter,
                                noise_method=noise_method, noise_stddev_adj=adjust_noise,
-                               ar_order=ar_order, conditional=conditional,
-                               mask_method=mask_method,
-                               probmatching_method=prob_matching, 
+                               ar_order=ar_order, conditional=conditional, mask_kwargs={'mask_rim':10},
+                               mask_method=mask_method, probmatching_method=prob_matching, 
                                vel_pert_method=motion_pert, vel_pert_kwargs=vel_pert_kwargs, seed=seed)
 
             ## if necessary, transform back all data to rainrates
