@@ -16,17 +16,26 @@ from pysteps import rcparams
 # Import or define precip events
 sys.path.insert(0,'..')
 import precipevents
-precipevents = precipevents.mch
-precipevents = [("201701311000", "201701311000"),
-                ("201607111300", "201607111300")]
-precipevents = [("201609281600", "201609281700")]
 
-# Parameters
-domain = "fmi" #"mch_hdf5"
+domain = "mch_hdf5" #"mch_hdf5"
+if domain == "fmi":
+    # all events
+    precipevents = precipevents.fmi
+    # only one event (for paper)
+    precipevents = [("201609281600", "201609281700")]
+if domain == "mch_hdf5":
+    # all events
+    precipevents = precipevents.mch
+    # only 2 events
+    precipevents = [("201701311000", "201701311000"),
+                    ("201607111300", "201607111300")]
+
+# Forecast parameters
 timestep_run = 240
 n_lead_times = 24
 num_prev_files = 9 # Only applies for darts
 
+# Experiment parameters
 of_methods = ["darts", "lucaskanade", "vet"]
 
 # Figure parameters   
@@ -85,8 +94,9 @@ for pei,pe in enumerate(precipevents):
                 UV = oflow_method(R_[-2:,:,:]) 
             
             # Simple advection nowcast
-            adv_method = stp.extrapolation.get_method("semilagrangian") 
-            R_fct = adv_method(R_[-1,:,:], UV, n_lead_times, verbose=True)
+            adv_method_init, adv_method = stp.extrapolation.get_method("semilagrangian") 
+            extrapolator = adv_method_init(shape=R_[-1,:,:].shape)
+            R_fct = adv_method(extrapolator, R_[-1,:,:], UV, n_lead_times, verbose=True)
             R_fct[np.isnan(R_fct)] = metadata_dbr["zerovalue"]
 
             # Plot Fourier spectra of nowcasts
