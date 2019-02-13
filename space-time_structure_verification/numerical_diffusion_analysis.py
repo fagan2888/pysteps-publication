@@ -19,9 +19,10 @@ import precipevents
 precipevents = precipevents.mch
 precipevents = [("201701311000", "201701311000"),
                 ("201607111300", "201607111300")]
+precipevents = [("201609281600", "201609281700")]
 
 # Parameters
-domain = "mch_hdf5"
+domain = "fmi" #"mch_hdf5"
 timestep_run = 240
 n_lead_times = 24
 num_prev_files = 9 # Only applies for darts
@@ -106,7 +107,7 @@ for pei,pe in enumerate(precipevents):
         # Decorate plot
         plt.legend(loc="lower left")
         
-        # ax.set_title(str(curdate), fontsize=16)
+        ax.set_title("Simple advection", fontsize=18)
         ax.set_ylim([-10,60])
         plt.setp(ax.get_xticklabels(), fontsize=14)
         plt.setp(ax.get_yticklabels(), fontsize=14)
@@ -115,7 +116,7 @@ for pei,pe in enumerate(precipevents):
         ax.grid()
         
         # Savefig
-        figname = 'figures/' + curdate.strftime("%Y%m%d%H%M") + '_numerical_diffusion_spectra.' + fmt
+        figname = 'figures/' + domain[0:3] + '_' + curdate.strftime("%Y%m%d%H%M") + '_numerical_diffusion_spectra.' + fmt
         plt.savefig(figname, bbox_inches="tight", dpi=200)
         print(figname, 'saved.')
         
