@@ -13,16 +13,15 @@ This script plots the results.
 
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from pylab import *
+import matplotlib.gridspec as gridspec
 import pickle
 from pysteps.verification import ensscores, probscores
 
 linecolors = ["C0", "C1", "C2", "C3", "C4", "C5", "C6"]
 linestyles = ['-', '-', '-', '-', '-']
 markers = ['o', 'o', 'o', 'o', 'o']
-minleadtime = 10
-maxleadtime = 60
-fixedleadtimes = [5, 11] # timesteps
-minmaxleadtimes = [10, 60] # min
+fixedleadtimes = [5, 11, 17] # timesteps
+minmaxleadtimes = [10, 90] # min
 R_thrs = [0.1, 1.0, 5.0, 10.0]
 
 with open("window_size_results.dat", "rb") as f:
@@ -52,11 +51,42 @@ for R_thr in R_thrs:
 
         savefig("figures/window_size_ROC_curves_%dmin_%03.1fmm.pdf" % ((lt+1)*5, R_thr), bbox_inches="tight")
         
-    # Reliability diagrams
+    # Rank hist
 
     for lt in fixedleadtimes:
-        fig = figure()
-        ax = fig.gca()
+        figure(figsize=(6,11))
+        gs = gridspec.GridSpec(2, 1)
+        ax = subplot(gs[0])
+
+        r_max = 0.0
+        for i,ws in enumerate(results.keys()):
+            rankhist = results[ws]["rankhist"][R_thr][lt]
+            r = ensscores.rankhist_compute(rankhist)
+            r_max = max(r_max, np.max(r))
+            x = np.linspace(0, 1, rankhist["num_ens_members"] + 1)
+            x += 0.5 * (x[1] - x[0])
+            ax.plot(x, r, color=linecolors[i], linestyle='-', marker='D', 
+                 label="%d km" % ws)
+                 
+        ax.plot(x, np.ones_like(x)*1/x.size, "k--")
+
+        xticks(x[::3] + (x[1] - x[0]), np.arange(1, len(x))[::3])
+        ax.set_xlim(0, 1+1.0/len(x))
+        ax.set_ylim(0, r_max*1.25)
+        ax.set_xlabel("Rank of observation (among ensemble members)")
+        ax.set_ylabel("Relative frequency")
+        ax.set_title("(a)")
+        ax.grid(True, axis='y', ls=':')
+        legend(fontsize=12)
+
+        # savefig("figures/window_size_rankhists_%dmin_%03.1fmm.pdf" % ((lt+1)*5, R_thr), bbox_inches="tight")
+        
+    # Reliability diagrams
+
+    # for lt in fixedleadtimes:
+        # fig = figure()
+        # ax = fig.gca()
+        ax = subplot(gs[1])
         iax = inset_axes(ax, width="35%", height="20%", loc=4, borderpad=3.5)
 
         sample_size_min = []
@@ -103,35 +133,9 @@ for R_thr in R_thrs:
         ax.legend(fontsize=12)
         ax.set_xlabel("Forecast probability")
         ax.set_ylabel("Observed relative frequency")
+        ax.set_title("(b)")
 
-        savefig("figures/window_size_reldiags_%dmin_%03.1fmm.pdf" % ((lt+1)*5, R_thr), bbox_inches="tight")
-        
-    # Rank hist
-
-    for lt in fixedleadtimes:
-        figure()
-
-        r_max = 0.0
-        for i,ws in enumerate(results.keys()):
-            rankhist = results[ws]["rankhist"][R_thr][lt]
-            r = ensscores.rankhist_compute(rankhist)
-            r_max = max(r_max, np.max(r))
-            x = np.linspace(0, 1, rankhist["num_ens_members"] + 1)
-            x += 0.5 * (x[1] - x[0])
-            plot(x, r, color=linecolors[i], linestyle='-', marker='D', 
-                 label="%d km" % ws)
-                 
-        plot(x, np.ones_like(x)*1/x.size, "k--", lw=0.8)
-
-        xticks(x[::3] + (x[1] - x[0]), np.arange(1, len(x))[::3])
-        xlim(0, 1+1.0/len(x))
-        ylim(0, r_max*1.25)
-        xlabel("Rank of observation (among ensemble members)")
-        ylabel("Relative frequency")
-        grid(True, axis='y', ls=':')
-        legend(fontsize=12)
-
-        savefig("figures/window_size_rankhists_%dmin_%03.1fmm.pdf" % ((lt+1)*5, R_thr), bbox_inches="tight")
+        savefig("figures/window_size_rankhist-reldiags_%dmin_%03.1fmm.pdf" % ((lt+1)*5, R_thr), bbox_inches="tight")
         
         
     # ROC areas

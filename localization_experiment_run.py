@@ -16,7 +16,6 @@ from datetime import datetime, timedelta
 import numpy as np
 import os
 import pickle
-import sys
 import time
 from pysteps import io, motion, nowcasts, utils
 from pysteps.postprocessing.ensemblestats import excprob
@@ -27,8 +26,8 @@ import datasources, precipevents
 
 window_sizes = [710, 360, 180, 90]
 domain = "mch_rzc"
-timestep = 30
-num_workers = 24
+timestep = 60
+num_workers = 6
 num_timesteps = 18
 ensemble_size = 24
 R_min = 0.1
@@ -73,7 +72,11 @@ for pei,pe in enumerate(precipevents):
 
         if curdate + num_timesteps*timedelta(minutes=datasource["timestep"]) > enddate:
             break
-        countnwc += 1    
+        countnwc += 1  
+        # if countnwc < 15: # debug
+            # curdate += timedelta(minutes=timestep)
+            # continue
+        print("+++++++++++++++++++++++++++++++++++++++++++++++++++++")
         print("Computing nowcast %d for event %d, start date %s..." % (countnwc, pei+1, str(curdate)))
 
         fns = io.archive.find_by_date(curdate, root_path, datasource["path_fmt"],
@@ -125,6 +128,7 @@ for pei,pe in enumerate(precipevents):
             continue
 
         for ws in window_sizes:
+            print("++++ window size = %d ++++" % ws)
             oflow = motion.get_method("lucaskanade")
             V = oflow(R)
             nc = nowcasts.sseps.forecast
@@ -165,10 +169,10 @@ for pei,pe in enumerate(precipevents):
                     res.append(dask.delayed(worker)(lt, R_thr))
             dask.compute(*res, num_workers=num_workers)
 
-        with open("window_size_results_2.dat", "wb") as f:
+        with open("window_size_results.dat", "wb") as f:
             pickle.dump(results, f)
 
         curdate += timedelta(minutes=timestep)
 
-with open("window_size_results_2.dat", "wb") as f:
+with open("window_size_results.dat", "wb") as f:
     pickle.dump(results, f)
