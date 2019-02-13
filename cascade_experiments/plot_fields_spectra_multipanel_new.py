@@ -39,23 +39,15 @@ def create_dir(directory_path):
             raise Exception("Error creating directory: " + directory_path)
 
 # Precipitation events
-data_source   = "mch"
+data_source   = "mch_hdf5"
 events = ["201701311000", "201607111300"]
 events = ["201701311000"]
 compute = True
 
 # Whether to analyze the rainfall accumulations or the final rainrate fields
 accumulation        = False
-adv_method          = "semilagrangian"  # semilagrangian, eulerian
-
-# Plot parameters          
-out_dir_figs= "./figures/"
-create_dir(out_dir_figs)
-fig_fmt = 'png'
-dpi = 300
-cartopy_scale = "10m"
-cols = ["C3", "C1", "C0", "C2"]
-
+adv_method          = "semilagrangian"
+  
 ## Methods
 oflow_method        = "lucaskanade"     # lucaskanade, darts, None
 nwc_method          = "steps"
@@ -67,7 +59,7 @@ decomp_method       = "fft"
 n_cascade_levels_l  = [1,8]
 mask_method_l       = ['incremental', None]     # sprog, obs or incremental
 
-n_prvs_times        = 3                 # use at least 9 with DARTS
+n_prvs_times        = 2                 # use at least 9 with DARTS
 n_lead_times        = 12
 n_ens_members       = 24
 ar_order            = 2
@@ -80,7 +72,7 @@ conditional         = False
 motion_pert         = 'bps'
 unit                = "mm/h"            # mm/h or dBZ
 transformation      = "dB"              # None or dB
-seed                = 42                # for reproducibility
+seed                = 24                # for reproducibility
 
 # Set the BPS motion perturbation parameters that are adapted to the Swiss domain
 # vp_par  = (2.56338484, 0.3330941, -2.99714349) # mch only
@@ -95,6 +87,19 @@ else:
     print("Using default parameters for motion perturbation.")
     vel_pert_kwargs = {} # Will use the default parameters
 
+# Plot parameters          
+out_dir_figs= "./figures/"
+create_dir(out_dir_figs)
+fig_fmt = 'png'
+dpi = 300
+cartopy_scale = "10m"
+cols = ["C3", "C1", "C0", "C2"]
+
+if data_source == "mch_hdf5":   
+    wavelength_ticks = [1024,512,256,128,64,32,16,8,4,2]
+if data_source == "mch_hdf5":
+    wavelength_ticks = [512,256,128,64,32,16,8,4,2]
+    
 ## LOOP over precipitation events
 for startdate_str in events:
     data_dir = join("./data", startdate_str)
@@ -166,12 +171,10 @@ for startdate_str in events:
         if adv_method == 'eulerian':
             print('Setting not available.')
             sys.exit(1)
-            # R_mmhr = to_dB(R[-1,:,:], metadata, inverse=True)[0]
-            # R_obs_accum = np.mean(R_mmhr, axis=0)
-            # accum_txt = '-60-0' + str(int(n_lead_times/12)) + ' min accumulation'
         else:
             R_obs_accum = np.mean(R_obs, axis=0)
-            valid_time_txt = '+' + str(int(n_lead_times*ds.timestep)) + ' min'
+            valid_time_fx_txt = '+' + str(int(n_lead_times*ds.timestep)) + ' min'
+            valid_time_obs_txt = valid_time_fx_txt
         accum_txt = 'accumulation'
         
     else:
@@ -183,7 +186,7 @@ for startdate_str in events:
             valid_time_fx_txt = '+' + str(int(n_lead_times*ds.timestep)) + ' min'
         else:
             R_obs_accum = R_obs[-1,:,:]
-            valid_time_obs_txt = '+' + str(int(n_lead_times*ds.timestep)) + ' min'
+            valid_time_obs_txt = '0 min'
             valid_time_fx_txt = '+' + str(int(n_lead_times*ds.timestep)) + ' min'
         accum_txt = 'rain rate'
     
@@ -253,7 +256,6 @@ for startdate_str in events:
 
     ax = plt.subplot(gs[1,0])
     lw = 1.0
-    wavelength_ticks = [512,256,128,64,32,16,8,4,2]
     stp.plt.plot_rapsd(fft_freq, R_obs_accum_spectrum, x_units='km',
                        y_units='dBR', wavelength_ticks=wavelength_ticks,
                        color='k', lw=2.0, label='Observations', ax=ax)
@@ -287,16 +289,15 @@ for startdate_str in events:
                                    n_cascade_levels, kmperpixel=metadata["xpixelsize"]/1000,
                                    timestep=ds.timestep,  R_thr=metadata["threshold"],
                                    extrap_method=adv_method, decomp_method=decomp_method,
-                                   bandpass_filter_method=bandpass_filter,
+                                   bandpass_filter_method=bandpass_filter, num_ensemble_workers=4,
                                    noise_method=noise_method, noise_stddev_adj=adjust_noise,
                                    ar_order=ar_order, conditional=conditional,
-                                   mask_method=mask_method,
+                                   mask_method=mask_method, mask_kwargs={'mask_rim':10},
                                    probmatching_method=prob_matching,
                                    vel_pert_method=motion_pert, vel_pert_kwargs=vel_pert_kwargs, seed=seed)
 
                 ## if necessary, transform back all data to rainrates
                 R_fct, metadata_fct = to_dB(R_fct, metadata, inverse=True)
-
 
                 create_dir(data_dir)
 
@@ -362,7 +363,7 @@ for startdate_str in events:
                 stp.plt.plot_rapsd(fft_freq, R_fct_accum_spectrum, color=cols[w], lw=1.0, label=title_str, ax=ax)
             if p == len(n_cascade_levels_l)*len(mask_method_l) + 2:
                 # Create legend
-                leg = ax.legend(fontsize=12, loc='lower left')
+                leg = ax.legend(fontsize=11, loc='lower left')
                 c=-1
                 for text in leg.get_texts():
                     if c >= 0:
@@ -415,7 +416,7 @@ for startdate_str in events:
 
     cax.title.set_fontsize(15)
     # Save plot
-    figname = out_dir_figs + startdate_str + '_multipanel_' + adv_method + "_" + str(int(n_lead_times)*ds.timestep) + 'min_accumulation-' + str(accumulation) + '.' + fig_fmt
+    figname = out_dir_figs + data_source[0:3] + '_' + startdate_str + '_multipanel_' + adv_method + "_" + str(int(n_lead_times)*ds.timestep) + 'min_accumulation-' + str(accumulation) + '.' + fig_fmt
     plt.savefig(figname, dpi=dpi, bbox_inches='tight')
     print(figname, 'saved.')
     
