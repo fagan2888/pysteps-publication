@@ -289,7 +289,7 @@ for startdate_str in events:
                                    n_cascade_levels, kmperpixel=metadata["xpixelsize"]/1000,
                                    timestep=ds.timestep,  R_thr=metadata["threshold"],
                                    extrap_method=adv_method, decomp_method=decomp_method,
-                                   bandpass_filter_method=bandpass_filter, num_ensemble_workers=4,
+                                   bandpass_filter_method=bandpass_filter, num_workers=4,
                                    noise_method=noise_method, noise_stddev_adj=adjust_noise,
                                    ar_order=ar_order, conditional=conditional,
                                    mask_method=mask_method, mask_kwargs={'mask_rim':10},
