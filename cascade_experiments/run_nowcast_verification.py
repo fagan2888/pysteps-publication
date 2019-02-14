@@ -13,58 +13,68 @@ import os
 import pickle
 import sys
 import time
+import sys
 
 from pysteps import rcparams, io, motion, nowcasts, utils
 from pysteps.postprocessing.ensemblestats import excprob
 from pysteps.utils import transformation, conversion
 from pysteps.verification import ensscores
 from pysteps.verification import probscores
-
-# Cascade experiments
-cascade_levels = [1,8]
-mask_methods = ['incremental', None]
-
-# Output file basename containing the verification statistics
-filename_verif_base = "data/cascade_results"
-
-# Verification parameters
-R_thrs = [0.1, 1.0, 5.0, 10.0]
-
-verify_accumulation = True
-v_leadtimes = [60]
-v_accu = 60
-
-# Forecast parameters
-domain = "mch_hdf5"
-timestep = 30
-R_min = 0.1
-
-num_timesteps = 12
-ensemble_size = 24
-num_workers = 24
-seed = 42
-
-if verify_accumulation:
-    idx_leadtimes = range(len(v_leadtimes))
-    num_timesteps = int(np.max(np.array(v_leadtimes))/5)
-    num_lead_times = len(v_leadtimes)
-    
-    filename_verif = filename_verif_base + "_accum" + ("%02i" % v_accu) + ".dat"
-else:
-    idx_leadtimes = range(num_timesteps)
-    num_lead_times = len(v_leadtimes)
-    v_leadtimes = (1+np.array(idx_leadtimes))*v_accu
-    v_accu = 5
-    
-    filename_verif = filename_verif_base + "_rainrate.dat"
+from pysteps.utils import aggregate_fields_space, clip_domain
 
 # Data
 sys.path.insert(0,'..')
 import precipevents
 
+domain = "mch_hdf5"
+time_res = 5
 datasource = rcparams.data_sources[domain]
 precipevents = precipevents.mch
-# precipevents = [("201604161800", "201604161900")] # single-event test
+precipevents = [("201604161800", "201604162200")] # single-event test
+
+# Cascade experiments
+cascade_levels = [1,8]
+mask_methods = ['incremental', None]
+
+# Forecast parameters
+timestep = 30
+R_min = 0.1
+
+num_timesteps = 12
+ensemble_size = 24
+num_workers = 12
+seed = 24
+
+# Output file basename containing the verification statistics
+filename_verif_base = "data/cascade_results"
+
+# Verification parameters
+R_thrs = [0.1, 1.0, 5.0]      # Rainfall thresholds to verify (same applies for accumulations)
+v_scales_km = [1, 10, 40]             # Spatial scales to verify [km] (must be divisors of clipped grid size)
+v_accu_min = 60                      # Temporal accumulation to verify [min]
+
+# Lead times to verify [min]
+if v_accu_min == 60:
+    v_leadtimes = [60]             
+if v_accu_min == 30:
+    v_leadtimes = [30,60]    
+if v_accu_min == time_res:
+    v_leadtimes = [5,10,15,20,25,30,45,60]
+    
+# Derive indices for lead times 
+v_leadtimes = np.array(v_leadtimes)
+idx_leadtimes = (np.array(v_leadtimes)/v_accu_min - 1).astype(int)
+print("Verifying lead times [min]:", v_leadtimes, ", indices:", idx_leadtimes)  
+ 
+# Check if verification parameters are coherent    
+if v_leadtimes.max() >  num_timesteps*time_res:
+    print("num_timesteps should be large enough to contain the maximum v_leadtimes")
+    sys.exit()
+if v_leadtimes.min() < v_accu_min:
+    print("Minimum valid lead time in v_leadtimes should larger than the accumulation time")
+    sys.exit()
+filename_verif = filename_verif_base + "_accum" + ("%02i" % v_accu_min) + ".dat"
+v_leadtimes = v_leadtimes.tolist()
 
 # vp_par  = (2.56338484, 0.3330941, -2.99714349) # mch only
 # vp_perp = (1.31204508, 0.3578426, -1.02499891)
@@ -82,9 +92,9 @@ badts = np.concatenate((badts2016, badts2017))
 # Instantiate dictionary containing the verification results
 results = {}
 results["metadata"] = {}
-results["metadata"]["accumulation"] = verify_accumulation
-results["metadata"]["v_accu"] = v_accu
+results["metadata"]["v_accu_min"] = v_accu_min
 results["metadata"]["v_leadtimes"] = v_leadtimes
+results["metadata"]["v_scales_km"] = v_scales_km
 
 for c in cascade_levels:
     for m in mask_methods:
@@ -96,10 +106,14 @@ for c in cascade_levels:
             results[c,m]["reldiag"][R_thr] = {}
             results[c,m]["rankhist"][R_thr] = {}
             results[c,m]["ROC"][R_thr] = {}
-            for lt in range(num_lead_times):
-                results[c,m]["reldiag"][R_thr][lt] = probscores.reldiag_init(R_thr, n_bins=10)
-                results[c,m]["rankhist"][R_thr][lt] = ensscores.rankhist_init(ensemble_size, R_thr)
-                results[c,m]["ROC"][R_thr][lt] = probscores.ROC_curve_init(R_thr, n_prob_thrs=100)
+            for scale_km in v_scales_km:
+                results[c,m]["reldiag"][R_thr][scale_km] = {}
+                results[c,m]["rankhist"][R_thr][scale_km] = {}
+                results[c,m]["ROC"][R_thr][scale_km] = {}
+                for lt in v_leadtimes:
+                    results[c,m]["reldiag"][R_thr][scale_km][lt] = probscores.reldiag_init(R_thr, n_bins=10)
+                    results[c,m]["rankhist"][R_thr][scale_km][lt] = ensscores.rankhist_init(ensemble_size, R_thr)
+                    results[c,m]["ROC"][R_thr][scale_km][lt] = probscores.ROC_curve_init(R_thr, n_prob_thrs=100)
 
 for pei,pe in enumerate(precipevents):
     curdate = datetime.strptime(pe[0], "%Y%m%d%H%M")
@@ -160,10 +174,10 @@ for pei,pe in enumerate(precipevents):
         metaobs["threshold"] = R_min
         
         # Compute observed accumulations
-        if verify_accumulation:
+        metafct = metaobs.copy()
+        if v_accu_min > time_res:
             aggregator = utils.get_method("accumulate")
-            metafct = metaobs.copy()
-            R_obs, metaobs = aggregator(R_obs, metaobs, v_accu)
+            R_obs, metaobs = aggregator(R_obs, metaobs, v_accu_min)
 
             R_obs[R_obs < R_min] = 0.0
             metaobs["threshold"] = R_min            
@@ -199,38 +213,57 @@ for pei,pe in enumerate(precipevents):
                 R_fct = transformation.dB_transform(R_fct, metadata, inverse=True)[0]
                 
                 # Compute forecast accumulations
-                if verify_accumulation:
-                    R_fct, metafct_accum = aggregator(R_fct, metafct, v_accu)
+                if v_accu_min > time_res:
+                    R_fct, metafct_accum = aggregator(R_fct, metafct, v_accu_min)
                     
                     R_fct[R_fct < R_min] = 0.0
                     metafct_accum["threshold"] = R_min
                 
+                # Clip domain
+                if domain[0:3] == 'mch':
+                    xlim = [400000, 840000]
+                    ylim = [-50000, 350000]
+                    extent = (xlim[0], xlim[1], ylim[0], ylim[1]) 
+                    R_fct_c, metafct_c = clip_domain(R_fct, metafct, extent)
+                    R_obs_c, metaobs_c = clip_domain(R_obs, metaobs, extent)
+                else:
+                    print("To verify upscaled fields you should clip domain appropriately")
+                    sys.exit()
+                
                 # Verify nowcasts
-                def worker(lt, R_thr):
-                    if not np.any(np.isfinite(R_obs[lt, :, :])):
-                        return
-
-                    P_fct = excprob(R_fct[:, lt, :, :], R_thr, ignore_nan=True)
-
-                    probscores.reldiag_accum(results[c,m]["reldiag"][R_thr][lt], 
-                                             P_fct, R_obs[lt, :, :])
-                    ensscores.rankhist_accum(results[c,m]["rankhist"][R_thr][lt], 
-                                             R_fct[:, lt, :, :], R_obs[lt, :, :])
-                    probscores.ROC_curve_accum(results[c,m]["ROC"][R_thr][lt], 
-                                               P_fct, R_obs[lt, :, :])
+                print("Verifying nowcasts...")
+                def worker(lt, R_thr, scale_km):
+                    lt_idx = int(lt/v_accu_min - 1)
+                    if not np.any(np.isfinite(R_obs_c[lt_idx, :, :])):
+                        return 
+                    # print(c,m,R_thr,scale_km,lt,lt_idx)                    
+                    R_fct_s,_ = aggregate_fields_space(R_fct_c, metafct_c, scale_km*1000, ignore_nan=False)
+                    R_obs_s,_ = aggregate_fields_space(R_obs_c, metaobs_c, scale_km*1000, ignore_nan=False)
+                    
+                    P_fct = excprob(R_fct_s[:, lt_idx, :, :], R_thr, ignore_nan=True)
+                    
+                    probscores.reldiag_accum(results[c,m]["reldiag"][R_thr][scale_km][lt], 
+                                             P_fct, R_obs_s[lt_idx, :, :])
+                    ensscores.rankhist_accum(results[c,m]["rankhist"][R_thr][scale_km][lt], 
+                                             R_fct_s[:, lt_idx, :, :], R_obs_s[lt_idx, :, :])
+                    probscores.ROC_curve_accum(results[c,m]["ROC"][R_thr][scale_km][lt], 
+                                               P_fct, R_obs_s[lt_idx, :, :])
                 res = []
                 for R_thr in R_thrs:
-                    for lt in idx_leadtimes:
-                        missing_data = np.all(~np.isfinite(R_obs[lt, :, :]))
-                        low_quality = metaobs["timestamps"][lt].strftime("%Y%m%d%H%M") in badts
-                        if missing_data or low_quality:
-                            print("Warning: no verifying observations for lead time %d." % (lt+1))
-                            continue
-                        res.append(dask.delayed(worker)(lt, R_thr))
+                    for scale_km in v_scales_km:
+                        for lt in v_leadtimes:
+                            lt_idx = int(lt/v_accu_min - 1)
+                            missing_data = np.all(~np.isfinite(R_obs[lt_idx, :, :]))
+                            low_quality = metaobs["timestamps"][lt_idx].strftime("%Y%m%d%H%M") in badts
+                            if missing_data or low_quality:
+                                print("Warning: no verifying observations for lead time %d." % (lt))
+                                continue
+                            res.append(dask.delayed(worker)(lt, R_thr, scale_km))
                 dask.compute(*res, num_workers=num_workers)
                 
                 toc = time.time()
                 print('Elapsed time:', toc-tic)
+                print('+++++++++++++++++++++++++++++++++++++++++++++++++++++++')
         with open(filename_verif, "wb") as f:
             pickle.dump(results, f)
 
