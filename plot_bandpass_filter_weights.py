@@ -5,6 +5,7 @@ matplotlib.rcParams["text.latex.preamble"] = [r"\usepackage{amsmath}"]
 
 from matplotlib import pyplot, ticker
 import numpy as np
+from scipy.interpolate import interp1d
 from pysteps.cascade.bandpass_filters import filter_gaussian
 
 grid_size = 1227
@@ -12,7 +13,7 @@ grid_res = 1.0
 num_levels = 8
 normalize = True
 
-F = filter_gaussian(grid_size, num_levels)#, l_0=3, gauss_scale=0.5, gauss_scale_0=0.5)
+F = filter_gaussian(grid_size, num_levels)
 
 fig = pyplot.figure()
 ax1 = fig.gca()
@@ -22,7 +23,9 @@ w = F["weights_1d"]
 cf = F["central_freqs"]
 
 for i in range(len(w)):
-    ax1.semilogx(np.arange(len(w[i])), w[i], "k-", lw=2)
+    x_ip = np.linspace(0, len(w[i])-1, 10000)
+    y_ip = interp1d(np.arange(len(w[i])), w[i], kind="cubic")(x_ip)
+    ax1.semilogx(x_ip, y_ip, "k-", lw=2)
     ax1.plot([cf[i], cf[i]], [0, 1], "k--")
 
 cf[0] = 1
