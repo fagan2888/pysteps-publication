@@ -9,7 +9,8 @@ from pysteps.io.importers import import_fmi_pgm
 from pysteps.cascade.decomposition import decomposition_fft
 
 date = datetime.strptime("201609281600", "%Y%m%d%H%M")
-root_path = "/top/college/academic/ECE/spulkkin/home/ohjelmistokehitys/pySTEPS/pysteps-data/radar/fmi"
+# insert your data path here
+root_path = ""
 fn_pattern = "%Y%m%d%H%M_fmi.radar.composite.lowest_FIN_SUOMI1"
 fn_ext = "pgm.gz"
 
