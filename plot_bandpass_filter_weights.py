@@ -15,7 +15,7 @@ normalize = True
 
 F = filter_gaussian(grid_size, num_levels)
 
-fig = pyplot.figure()
+fig = pyplot.figure(figsize=(5, 3.75))
 ax1 = fig.gca()
 ax2 = ax1.twiny()
 
