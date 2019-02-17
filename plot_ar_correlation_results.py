@@ -21,7 +21,7 @@ for i in range(num_cascade_levels):
 
 lines = ax.get_lines()
 l = pyplot.legend([lines[0], lines[num_cascade_levels+1]], ["AR(2)", "Observed"],
-                  fontsize=12, loc=(0.6, 0.9))
+                  fontsize=12, loc=(0.6, 0.9), framealpha=1.0)
 ax.add_artist(l)
 
 ax.text(150, 0.85, '1', fontsize=10)
