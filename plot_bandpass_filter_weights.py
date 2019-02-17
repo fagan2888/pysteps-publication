@@ -8,7 +8,7 @@ import numpy as np
 from scipy.interpolate import interp1d
 from pysteps.cascade.bandpass_filters import filter_gaussian
 
-grid_size = 1227
+grid_size = 1226
 grid_res = 1.0
 num_levels = 8
 normalize = True
