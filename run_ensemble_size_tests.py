@@ -108,7 +108,8 @@ for pei,pe in enumerate(precipevents):
 
         for es in ensemble_sizes:
             oflow = motion.get_method("lucaskanade")
-            V = oflow(R)
+            V = oflow(R[-2:, :, :])
+
             nc = nowcasts.get_method("steps")
             vel_pert_kwargs = {"p_pert_par":vp_par , "p_pert_perp":vp_perp}
             R_fct = nc(R[-3:, :, :], V, num_timesteps, n_ens_members=es, 
