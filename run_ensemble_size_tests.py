@@ -17,24 +17,24 @@ from pysteps.verification import ensscores
 from pysteps.verification import probscores
 import datasources, precipevents
 
-ensemble_sizes = [48, 24, 12, 6]
-domain = "mch"
+ensemble_sizes = [96, 48, 24, 12, 6]
+domain = "fmi"
+#domain = "mch"
 timestep = 30
 num_workers = 6
-num_timesteps = 24
+num_timesteps = 36
 R_min = 0.1
 R_thrs = [0.1, 1.0, 5.0, 10.0]
+
+vp_par  = (2.31970635, 0.33734287, -2.64972861)
+vp_perp = (1.90769947, 0.33446594, -2.06603662)
 
 if domain == "fmi":
     datasource = datasources.fmi
     precipevents = precipevents.fmi
-    vp_par  = (2.48791765, 0.32442381, -2.85858525)
-    vp_perp = (1.7400854,  0.35100831, -1.8278687)
 else:
     datasource = datasources.mch
     precipevents = precipevents.mch
-    vp_par  = (2.56338484, 0.3330941, -2.99714349)
-    vp_perp = (1.31204508, 0.3578426, -1.02499891)
 
 root_path = os.path.join(datasources.root_path, datasource["root_path"])
 importer = io.get_method(datasource["importer"], "importer")
