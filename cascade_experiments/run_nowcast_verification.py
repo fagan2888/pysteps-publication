@@ -26,11 +26,18 @@ from pysteps.utils import aggregate_fields_space, clip_domain
 sys.path.insert(0,'..')
 import precipevents
 
-domain = "mch_hdf5"
+data_source = "mch_hdf5"
 time_res = 5
-datasource = rcparams.data_sources[domain]
-precipevents = precipevents.mch
-precipevents = [("201604161800", "201604162200")] # single-event test
+if data_source == "fmi":
+    # all events
+    precipevents = precipevents.fmi
+    # only one event (comment out if you want all events)
+    precipevents = [("201609291000", "201609291800")]
+if data_source == "mch_hdf5":
+    # all events
+    precipevents = precipevents.mch
+    # only 1 event (comment out if you want all events)
+    # precipevents = [("201701311000", "201701311000")]
 
 # Cascade experiments
 cascade_levels = [1,8]
@@ -46,13 +53,14 @@ num_workers = 12
 seed = 24
 
 # Output file basename containing the verification statistics
-filename_verif_base = "data/cascade_results"
+filename_verif_base = "data/" + data_source[0:3] + "_cascade_results"
 
 # Verification parameters
-R_thrs = [0.1, 1.0, 5.0]      # Rainfall thresholds to verify (same applies for accumulations)
-v_scales_km = [1, 10, 40]             # Spatial scales to verify [km] (must be divisors of clipped grid size)
-v_accu_min = 60                      # Temporal accumulation to verify [min]
+R_thrs = [0.1, 1.0, 5.0]            # Rainfall thresholds to verify (same applies for accumulations)
+v_scales_km = [1, 10, 40]           # Spatial scales to verify [km] (must be divisors of clipped grid size)
+v_accu_min = 5                     # Temporal accumulation to verify [min]. Only one value possible
 
+# +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++# 
 # Lead times to verify [min]
 if v_accu_min == 60:
     v_leadtimes = [60]             
@@ -81,6 +89,7 @@ v_leadtimes = v_leadtimes.tolist()
 vp_par  = (2.31970635, 0.33734287, -2.64972861) # fmi+mch
 vp_perp = (1.90769947, 0.33446594, -2.06603662)
 
+datasource = rcparams.data_sources[data_source]
 root_path = datasource["root_path"]
 importer = io.get_method(datasource["importer"], "importer")
 
