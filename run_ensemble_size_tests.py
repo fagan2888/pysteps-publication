@@ -117,19 +117,21 @@ for pei,pe in enumerate(precipevents):
                        mask_method="incremental", num_workers=num_workers, 
                        fft_method="pyfftw", vel_pert_kwargs=vel_pert_kwargs)
 
-            R_fct = transformation.dB_transform(R_fct, inverse=True)[0]
-
             def worker(lt, R_thr):
                 if not np.any(np.isfinite(R_obs[lt, :, :])):
                     return
 
-                P_fct = excprob(R_fct[:, lt, :, :], R_thr)
+                R_fct_ = transformation.dB_transform(R_fct[:, lt, :, :], inverse=True)[0]
 
-                probscores.reldiag_accum(results[es]["reldiag"][R_thr][lt], 
-                                         P_fct, R_obs[lt, :, :])
                 ensscores.rankhist_accum(results[es]["rankhist"][R_thr][lt], 
-                                         R_fct[:, lt, :, :], R_obs[lt, :, :])
-                probscores.ROC_curve_accum(results[es]["ROC"][R_thr][lt], 
+                                         R_fct_, R_obs[lt, :, :])
+                R_fct_ = None
+
+                P_fct = excprob(R_fct_, R_thr)
+
+                probscores.reldiag_accum(results[es]["reldiag"][R_thr][lt],
+                                         P_fct, R_obs[lt, :, :])
+                probscores.ROC_curve_accum(results[es]["ROC"][R_thr][lt],
                                            P_fct, R_obs[lt, :, :])
 
             res = []
