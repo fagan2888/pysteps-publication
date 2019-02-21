@@ -141,10 +141,10 @@ for pei,pe in enumerate(precipevents):
                     res.append(dask.delayed(worker)(lt, R_thr))
             dask.compute(*res, num_workers=num_workers)
 
-        with open("ensemble_size_results.dat", "wb") as f:
+        with open("ensemble_size_results_%s.dat" % domain, "wb") as f:
             pickle.dump(results, f)
 
         curdate += timedelta(minutes=timestep)
 
-with open("ensemble_size_results.dat", "wb") as f:
+with open("ensemble_size_results_%s.dat" % domain, "wb") as f:
     pickle.dump(results, f)
