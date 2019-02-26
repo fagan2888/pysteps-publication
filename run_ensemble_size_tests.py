@@ -18,14 +18,15 @@ from pysteps.verification import probscores
 import datasources, precipevents
 
 ensemble_sizes = [96, 48, 24, 12, 6]
-domain = "fmi"
-#domain = "mch"
+# TODO: This script does not currently work for the FMI data because it contains
+#reflectivities and not precipitation intensities.
+#domain = "fmi"
+domain = "mch"
 timestep = 30
 num_workers = 6
 num_timesteps = 36
 R_min = 0.1
 R_thrs = [0.1, 1.0, 5.0, 10.0]
-seed = 24
 
 vp_par  = (2.31970635, 0.33734287, -2.64972861)
 vp_perp = (1.90769947, 0.33446594, -2.06603662)
@@ -117,8 +118,7 @@ for pei,pe in enumerate(precipevents):
                        n_cascade_levels=6, R_thr=R_min_dB, kmperpixel=1.0,
                        timestep=5, vel_pert_method="bps",
                        mask_method="incremental", num_workers=num_workers,
-                       fft_method="pyfftw", vel_pert_kwargs=vel_pert_kwargs,
-                       seed=seed)
+                       fft_method="pyfftw", vel_pert_kwargs=vel_pert_kwargs)
 
             for ei in range(R_fct.shape[0]):
                 for lt in range(R_fct.shape[1]):
