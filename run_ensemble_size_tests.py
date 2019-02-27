@@ -43,16 +43,22 @@ results = {}
 
 for es in ensemble_sizes:
     results[es] = {}
-    results[es]["reldiag"] = {}
+
+    results[es]["CRPS"] = {}
     results[es]["rankhist"] = {}
+    results[es]["reldiag"] = {}
     results[es]["ROC"] = {}
+
+    for lt in range(num_timesteps):
+        results[es]["CRPS"][lt] = probscores.CRPS_init()
+
     for R_thr in R_thrs:
-        results[es]["reldiag"][R_thr] = {}
         results[es]["rankhist"][R_thr] = {}
+        results[es]["reldiag"][R_thr] = {}
         results[es]["ROC"][R_thr] = {}
         for lt in range(num_timesteps):
-            results[es]["reldiag"][R_thr][lt] = probscores.reldiag_init(R_thr, n_bins=10)
             results[es]["rankhist"][R_thr][lt] = ensscores.rankhist_init(es, R_thr)
+            results[es]["reldiag"][R_thr][lt] = probscores.reldiag_init(R_thr, n_bins=10)
             results[es]["ROC"][R_thr][lt] = probscores.ROC_curve_init(R_thr, n_prob_thrs=100)
 
 R_min_dB = transformation.dB_transform(np.array([R_min]))[0][0]
@@ -123,7 +129,11 @@ for pei,pe in enumerate(precipevents):
                     R_fct[ei, lt, :, :] = \
                         transformation.dB_transform(R_fct[ei, lt, :, :], inverse=True)[0]
 
-            def worker(lt, R_thr):
+            def worker1(lt):
+                probscores.CRPS_accum(results[es]["CRPS"][lt], R_fct[:, lt, :, :],
+                                      R_obs[lt, :, :])
+
+            def worker2(lt, R_thr):
                 if not np.any(np.isfinite(R_obs[lt, :, :])):
                     return
 
@@ -137,12 +147,14 @@ for pei,pe in enumerate(precipevents):
                                            P_fct, R_obs[lt, :, :])
 
             res = []
-            for R_thr in R_thrs:
+            for i,R_thr in enumerate(R_thrs):
                 for lt in range(num_timesteps):
                     if not np.any(np.isfinite(R_obs[lt, :, :])):
                         print("Warning: no finite verifying observations for lead time %d." % (lt+1))
                         continue
-                    res.append(dask.delayed(worker)(lt, R_thr))
+                    if i == 0:
+                        res.append(dask.delayed(worker1)(lt))
+                    res.append(dask.delayed(worker2)(lt, R_thr))
             dask.compute(*res, num_workers=num_workers)
 
         with open("ensemble_size_results_%s.dat" % domain, "wb") as f:
