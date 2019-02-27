@@ -111,7 +111,7 @@ for pei,pe in enumerate(precipevents):
             V = oflow(R[-2:, :, :])
 
             nc = nowcasts.get_method("steps")
-            vel_pert_kwargs = {"p_pert_par":vp_par , "p_pert_perp":vp_perp}
+            vel_pert_kwargs = {"p_par":vp_par , "p_perp":vp_perp}
             R_fct = nc(R[-3:, :, :], V, num_timesteps, n_ens_members=es,
                        n_cascade_levels=8, R_thr=R_min_dB, kmperpixel=1.0,
                        timestep=5, vel_pert_method="bps",
