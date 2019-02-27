@@ -16,7 +16,7 @@ with open("ensemble_size_results.dat", "rb") as f:
     results = pickle.load(f)
 
 for R_thr in results[ensemble_size]["ROC"].keys():
-    figure()
+    figure(figsize=(5, 3.5))
 
     plot([0, 1], [0, 1], "k--")
 
@@ -30,13 +30,13 @@ for R_thr in results[ensemble_size]["ROC"].keys():
     ylim(0, 1)
     xlabel("False alarm rate (POFD)")
     ylabel("Probability of detection (POD)")
-    grid(True, ls=':')
-    legend(fontsize=12)
+    grid(True)
+    legend(fontsize=12, framealpha=1.0)
 
     savefig("ROC_curves_%.1f.pdf" % R_thr, bbox_inches="tight")
 
 for R_thr in results[ensemble_size]["reldiag"].keys():
-    fig = figure()
+    fig = figure(figsize=(5, 3.5))
     ax = fig.gca()
     iax = inset_axes(ax, width="35%", height="20%", loc=4, borderpad=3.5)
 
@@ -74,21 +74,21 @@ for R_thr in results[ensemble_size]["reldiag"].keys():
     iax.yaxis.tick_right()
     iax.yaxis.set_label_position("right")
     iax.tick_params(axis="both", which="major", labelsize=6)
-    iax.grid(axis='y', ls=':')
+    iax.grid(axis='y')
 
     ax.plot([0, 1], [0, 1], "k--")
 
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
-    ax.grid(True, ls=':')
-    ax.legend(fontsize=12)
+    ax.grid(True)
+    ax.legend(fontsize=12, framealpha=1.0)
     ax.set_xlabel("Forecast probability")
     ax.set_ylabel("Observed relative frequency")
 
     savefig("reldiags_%.1f.pdf" % R_thr, bbox_inches="tight")
 
 for R_thr in results[ensemble_size]["rankhist"].keys():
-    figure()
+    figure(figsize=(5, 3.5))
 
     r_max = 0.0
     for i,lt in enumerate(leadtimes):
@@ -105,7 +105,7 @@ for R_thr in results[ensemble_size]["rankhist"].keys():
     ylim(0, r_max*1.25)
     xlabel("Rank of observation (among ensemble members)")
     ylabel("Relative frequency")
-    grid(True, axis='y', ls=':')
-    legend(fontsize=12)
+    grid(True, axis='y')
+    legend(fontsize=12, framealpha=1.0)
 
     savefig("rankhists_%.1f.pdf" % R_thr, bbox_inches="tight")
