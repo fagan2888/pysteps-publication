@@ -5,6 +5,8 @@ from pylab import *
 import pickle
 from pysteps.verification import ensscores, probscores
 
+#domain = "fmi"
+domain = "mch"
 linecolors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", 
               "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"]
 linestyles = ['-', '-', '-', '-', '-']
@@ -15,7 +17,7 @@ minleadtime = 5
 maxleadtime = 180
 R_thr = 0.1
 
-with open("ensemble_size_results.dat", "rb") as f:
+with open("ensemble_size_results_%s.dat" % domain, "rb") as f:
     results = pickle.load(f)
 
 ROC_areas = dict([(es, []) for es in sorted(results.keys())])
