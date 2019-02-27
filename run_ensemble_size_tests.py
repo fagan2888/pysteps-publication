@@ -18,8 +18,6 @@ from pysteps.verification import probscores
 import datasources, precipevents
 
 ensemble_sizes = [96, 48, 24, 12, 6]
-# TODO: This script does not currently work for the FMI data because it contains
-#reflectivities and not precipitation intensities.
 #domain = "fmi"
 domain = "mch"
 timestep = 30
@@ -89,7 +87,7 @@ for pei,pe in enumerate(precipevents):
             continue
 
         R[~np.isfinite(R)] = metadata["zerovalue"]
-        R = transformation.dB_transform(R)[0]
+        R = transformation.dB_transform(R, metadata=metadata)[0]
 
         obs_fns = io.archive.find_by_date(curdate, root_path, datasource["path_fmt"],
                                           datasource["fn_pattern"], datasource["fn_ext"],
@@ -115,7 +113,7 @@ for pei,pe in enumerate(precipevents):
             nc = nowcasts.get_method("steps")
             vel_pert_kwargs = {"p_pert_par":vp_par , "p_pert_perp":vp_perp}
             R_fct = nc(R[-3:, :, :], V, num_timesteps, n_ens_members=es,
-                       n_cascade_levels=6, R_thr=R_min_dB, kmperpixel=1.0,
+                       n_cascade_levels=8, R_thr=R_min_dB, kmperpixel=1.0,
                        timestep=5, vel_pert_method="bps",
                        mask_method="incremental", num_workers=num_workers,
                        fft_method="pyfftw", vel_pert_kwargs=vel_pert_kwargs)

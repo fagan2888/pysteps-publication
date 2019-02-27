@@ -17,7 +17,7 @@ import precipevents
 # the ensemble sizes to use
 ensemble_sizes = [6, 12, 24, 48]
 # maximum number of threads to use
-max_num_threads = 8
+max_num_threads = 12
 # the domain: "fmi" or "mch"
 domain = "fmi"
 # number of nowcast time steps to compute
@@ -71,7 +71,7 @@ for pei, pe in enumerate(precipevents):
             continue
 
         R[~np.isfinite(R)] = metadata["zerovalue"]
-        R = transformation.dB_transform(R)[0]
+        R = transformation.dB_transform(R, metadata=metadata)[0]
 
         oflow = motion.get_method("lucaskanade")
         V = oflow(R[-2:, :, :])

@@ -81,7 +81,7 @@ for pei,pe in enumerate(precipevents):
             continue
 
         R[~np.isfinite(R)] = metadata["zerovalue"]
-        R = transformation.dB_transform(R)[0]
+        R = transformation.dB_transform(R, metadata=metadata)[0]
 
         obs_fns = io.archive.find_by_date(curdate, root_path, datasource["path_fmt"],
                                           datasource["fn_pattern"], datasource["fn_ext"],
