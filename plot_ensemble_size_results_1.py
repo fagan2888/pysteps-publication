@@ -21,21 +21,40 @@ with open("ensemble_size_results_%s.dat" % domain, "rb") as f:
     results = pickle.load(f)
 
 ROC_areas = dict([(es, []) for es in sorted(results.keys())])
-OPs = dict([(es, []) for es in sorted(results.keys())])
+OP = dict([(es, []) for es in sorted(results.keys())])
+CRPS = dict([(es, []) for es in sorted(results.keys())])
 
 for es in sorted(results.keys()):
-  if not es in ROC_areas.keys():
-      ROC_areas[es] = []
+  for lt in sorted(results[es]["CRPS"].keys()):
+      CRPS[es].append(probscores.CRPS_compute(results[es]["CRPS"][lt]))
+
   for lt in sorted(results[es]["ROC"][R_thr].keys()):
       a = probscores.ROC_curve_compute(results[es]["ROC"][R_thr][lt], compute_area=True)[2]
       ROC_areas[es].append(a)
   for lt in sorted(results[es]["rankhist"][R_thr].keys()):
       rh = ensscores.rankhist_compute(results[es]["rankhist"][R_thr][lt])
-      OP = (rh[0] + rh[-1]) / sum(rh)
-      OPs[es].append(OP)
+      OP_ = (rh[0] + rh[-1]) / sum(rh)
+      OP[es].append(OP_)
 
 fig = figure(figsize=(5, 3.5))
 ax = fig.gca()
+
+for i,es in enumerate(sorted(results.keys())):
+  leadtimes = (np.array(sorted(results[es]["CRPS"].keys())) + 1) * 5
+  ax.plot(leadtimes, CRPS[es], ls=linestyles[i], marker=markers[i],
+          label="n=%d" % es)
+
+ax.set_xlim(minleadtime, maxleadtime)
+ax.set_xlabel("Lead time (minutes)")
+ax.set_ylabel("CRPS (mm/h)")
+ax.grid(True)
+ax.legend(fontsize=12, framealpha=1.0)
+
+savefig("ensemble_size_CRPS.pdf", bbox_inches="tight")
+
+fig = figure(figsize=(5, 3.5))
+ax = fig.gca()
+
 for i,es in enumerate(sorted(ROC_areas.keys())):
     leadtimes = (arange(len(ROC_areas[es])) + 1) * 5
     ax.plot(leadtimes, ROC_areas[es], ls=linestyles[i], marker=markers[i], 
@@ -53,9 +72,9 @@ fig.savefig("ensemble_size_ROC_areas.pdf", bbox_inches="tight")
 
 fig = figure(figsize=(5, 3.5))
 ax = fig.gca()
-for i,es in enumerate(sorted(OPs.keys())):
-    leadtimes = (arange(len(OPs[es])) + 1) * 5
-    ax.plot(leadtimes, OPs[es], ls=linestyles[i], marker=markers[i], 
+for i,es in enumerate(sorted(OP.keys())):
+    leadtimes = (arange(len(OP[es])) + 1) * 5
+    ax.plot(leadtimes, OP[es], ls=linestyles[i], marker=markers[i], 
             color=linecolors[i], label="n=%d" % es, lw=2, ms=6)
 xt = np.hstack([5, np.arange(20, maxleadtime+20, 20)])
 ax.set_xticks(xt)
@@ -66,4 +85,4 @@ ax.legend(fontsize=12, framealpha=1.0, loc=(1.02, 0.3))
 ax.set_xlabel("Lead time (minutes)", fontsize=12)
 ax.set_ylabel("Percentage of outliers", fontsize=12)
 
-fig.savefig("ensemble_size_OPs.pdf", bbox_inches="tight")
+fig.savefig("ensemble_size_OP.pdf", bbox_inches="tight")
