@@ -6,13 +6,15 @@ from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 import pickle
 from pysteps.verification import ensscores, probscores
 
+#domain = "fmi"
+domain = "mch"
 linecolors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", 
               "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"]
 #leadtimes = [15, 30, 60, 90]
 leadtimes = [2, 11, 17, 23]
 ensemble_size = 24
 
-with open("ensemble_size_results.dat", "rb") as f:
+with open("ensemble_size_results_%s.dat" % domain, "rb") as f:
     results = pickle.load(f)
 
 for R_thr in results[ensemble_size]["ROC"].keys():
