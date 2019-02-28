@@ -12,7 +12,7 @@ import sys
 import time
 from pysteps import io, motion, nowcasts, utils
 from pysteps.postprocessing.ensemblestats import excprob
-from pysteps.utils import transformation
+from pysteps.utils import conversion, transformation
 from pysteps.verification import ensscores
 from pysteps.verification import probscores
 import datasources, precipevents
@@ -93,6 +93,8 @@ for pei,pe in enumerate(precipevents):
 
         R,_,metadata = io.readers.read_timeseries(fns, importer,
                                                   **datasource["importer_kwargs"])
+        if domain == "fmi":
+            R, metadata = conversion.to_rainrate(R, metadata, a=223.0, b=1.53)
 
         missing_data = False
         for i in range(R.shape[0]):
@@ -124,6 +126,9 @@ for pei,pe in enumerate(precipevents):
             curdate += timedelta(minutes=timestep)
             print("Skipping, no verifying observations found.")
             continue
+
+        if domain == "fmi":
+            R_obs, metadata = conversion.to_rainrate(R_obs, metadata, a=223.0, b=1.53)
 
         for es in ensemble_sizes:
             oflow = motion.get_method("lucaskanade")
