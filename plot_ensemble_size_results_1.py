@@ -20,11 +20,25 @@ R_thr = 0.1
 with open("ensemble_size_results_%s.dat" % domain, "rb") as f:
     results = pickle.load(f)
 
+ETS = dict([(es, []) for es in sorted(results.keys())])
+MAE = dict([(es, []) for es in sorted(results.keys())])
+ME = dict([(es, []) for es in sorted(results.keys())])
+
 ROC_areas = dict([(es, []) for es in sorted(results.keys())])
 OP = dict([(es, []) for es in sorted(results.keys())])
 CRPS = dict([(es, []) for es in sorted(results.keys())])
 
 for es in sorted(results.keys()):
+  for lt in sorted(results[es]["CRPS"].keys()):
+      d = results[es]["cat"][R_thr][lt]
+      H_r = (d["H"] + d["M"]) * (d["H"] + d["F"]) / (d["H"] + d["F"] + d["M"] + d["R"])
+      ETS_ = 1.0*(d["H"] - H_r) / (d["H"] + d["M"] + d["F"] - H_r)
+      ETS[es].append(ETS_)
+      d = results[es]["MAE"][R_thr][lt]
+      MAE[es].append(1.0*d["sum"] / d["n"])
+      d = results[es]["ME"][R_thr][lt]
+      ME[es].append(1.0*d["sum"] / d["n"])
+
   for lt in sorted(results[es]["CRPS"].keys()):
       CRPS[es].append(probscores.CRPS_compute(results[es]["CRPS"][lt]))
 
@@ -35,6 +49,39 @@ for es in sorted(results.keys()):
       rh = ensscores.rankhist_compute(results[es]["rankhist"][R_thr][lt])
       OP_ = (rh[0] + rh[-1]) / sum(rh)
       OP[es].append(OP_)
+
+for i in range(3):
+    fig = figure(figsize=(5, 3.5))
+    ax = fig.gca()
+
+    for j,es in enumerate(sorted(results.keys())):
+        if i == 0:
+            values = ETS[es]
+        elif i == 1:
+            values = MAE[es]
+        else:
+            values = ME[es]
+
+        leadtimes = (np.array(sorted(results[es]["MAE"][R_thr].keys())) + 1) * 5
+        ax.plot(leadtimes, values, ls=linestyles[j], marker=markers[j],
+                label="n=%d" % es)
+
+    ax.set_xlim(minleadtime, maxleadtime)
+    ax.set_xlabel("Lead time (minutes)")
+    ax.grid(True)
+    ax.legend(fontsize=12, framealpha=1.0)
+
+    if i == 0:
+        ax.set_ylabel("ETS (mm/h)")
+        outfn = "ensemble_size_ETS.pdf"
+    elif i == 1:
+        ax.set_ylabel("MAE (mm/h)")
+        outfn = "ensemble_size_MAE.pdf"
+    else:
+        ax.set_ylabel("ME (mm/h)")
+        outfn = "ensemble_size_ME.pdf"
+
+    savefig(outfn, bbox_inches="tight")
 
 fig = figure(figsize=(5, 3.5))
 ax = fig.gca()

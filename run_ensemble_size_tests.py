@@ -44,6 +44,10 @@ results = {}
 for es in ensemble_sizes:
     results[es] = {}
 
+    results[es]["cat"] = {}
+    results[es]["MAE"] = {}
+    results[es]["ME"] = {}
+
     results[es]["CRPS"] = {}
     results[es]["rankhist"] = {}
     results[es]["reldiag"] = {}
@@ -53,10 +57,19 @@ for es in ensemble_sizes:
         results[es]["CRPS"][lt] = probscores.CRPS_init()
 
     for R_thr in R_thrs:
+        results[es]["cat"][R_thr] = {}
+        results[es]["MAE"][R_thr] = {}
+        results[es]["ME"][R_thr] = {}
+
         results[es]["rankhist"][R_thr] = {}
         results[es]["reldiag"][R_thr] = {}
         results[es]["ROC"][R_thr] = {}
+
         for lt in range(num_timesteps):
+            results[es]["cat"][R_thr][lt] = {"H":0, "F":0, "M":0, "R":0}
+            results[es]["MAE"][R_thr][lt] = {"sum": 0.0, "n":0}
+            results[es]["ME"][R_thr][lt] = {"sum": 0.0, "n":0}
+
             results[es]["rankhist"][R_thr][lt] = ensscores.rankhist_init(es, R_thr)
             results[es]["reldiag"][R_thr][lt] = probscores.reldiag_init(R_thr, n_bins=10)
             results[es]["ROC"][R_thr][lt] = probscores.ROC_curve_init(R_thr, n_prob_thrs=100)
@@ -97,7 +110,7 @@ for pei,pe in enumerate(precipevents):
 
         obs_fns = io.archive.find_by_date(curdate, root_path, datasource["path_fmt"],
                                           datasource["fn_pattern"], datasource["fn_ext"],
-                                          datasource["timestep"], 
+                                          datasource["timestep"],
                                           num_next_files=num_timesteps)
         obs_fns = (obs_fns[0][1:], obs_fns[1][1:])
         if len(obs_fns[0]) == 0:
@@ -129,6 +142,8 @@ for pei,pe in enumerate(precipevents):
                     R_fct[ei, lt, :, :] = \
                         transformation.dB_transform(R_fct[ei, lt, :, :], inverse=True)[0]
 
+            R_fct_mean = np.mean(R_fct, axis=0)
+
             def worker1(lt):
                 probscores.CRPS_accum(results[es]["CRPS"][lt], R_fct[:, lt, :, :],
                                       R_obs[lt, :, :])
@@ -146,6 +161,28 @@ for pei,pe in enumerate(precipevents):
                 probscores.ROC_curve_accum(results[es]["ROC"][R_thr][lt],
                                            P_fct, R_obs[lt, :, :])
 
+            def worker3(lt, R_thr):
+                MASK_f = R_fct_mean[lt, :, :] > R_thr
+                MASK_o = R_obs[lt, :, :] > R_thr
+
+                H = np.logical_and(MASK_f, MASK_o)
+                F = np.logical_and(MASK_f, ~MASK_o)
+                M = np.logical_and(~MASK_f, MASK_o)
+                R = np.logical_and(~MASK_f, ~MASK_o)
+
+                MASK = np.logical_and(MASK_f, MASK_o)
+                n = np.sum(MASK)
+                me = R_fct_mean[lt, :, :][MASK] - R_obs[lt, :, :][MASK]
+
+                results[es]["cat"][R_thr][lt]["H"] += np.sum(H)
+                results[es]["cat"][R_thr][lt]["F"] += np.sum(F)
+                results[es]["cat"][R_thr][lt]["M"] += np.sum(M)
+                results[es]["cat"][R_thr][lt]["R"] += np.sum(R)
+                results[es]["ME"][R_thr][lt]["sum"] += np.sum(me)
+                results[es]["ME"][R_thr][lt]["n"] += n
+                results[es]["MAE"][R_thr][lt]["sum"] += np.sum(np.abs(me))
+                results[es]["MAE"][R_thr][lt]["n"] += n
+
             res = []
             for i,R_thr in enumerate(R_thrs):
                 for lt in range(num_timesteps):
@@ -155,6 +192,7 @@ for pei,pe in enumerate(precipevents):
                     if i == 0:
                         res.append(dask.delayed(worker1)(lt))
                     res.append(dask.delayed(worker2)(lt, R_thr))
+                    res.append(dask.delayed(worker3)(lt, R_thr))
             dask.compute(*res, num_workers=num_workers)
 
         with open("ensemble_size_results_%s.dat" % domain, "wb") as f:
