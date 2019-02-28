@@ -82,7 +82,7 @@ for pei,pe in enumerate(precipevents):
         plt.figure()
         ax = plt.subplot(111)
         R_obs_spectrum, fft_freq = stp.utils.rapsd(stp.utils.remove_rain_norain_discontinuity(R_[-1,:,:]), np.fft, d=1.0, return_freq=True)
-        stp.plt.plot_rapsd(fft_freq, R_obs_spectrum, x_units='km', y_units='dBR', label='Observation', wavelength_ticks=wavelength_ticks, color='k', lw=1.0, ax=ax)
+        stp.plt.plot_spectrum1d(fft_freq, R_obs_spectrum, x_units='km', y_units='dBR', label='Observation', wavelength_ticks=wavelength_ticks, color='k', lw=1.0, ax=ax)
         
         c=0
         for of_method in of_methods:
@@ -110,7 +110,7 @@ for pei,pe in enumerate(precipevents):
             for t in plot_leadtimes:
                 R_fct_shift = stp.utils.remove_rain_norain_discontinuity(R_fct[t,:,:])
                 R_fct_spectrum, fft_freq = stp.utils.rapsd(R_fct_shift, np.fft, d=1.0, return_freq=True)
-                stp.plt.plot_rapsd(fft_freq, R_fct_spectrum, color=colors_of[c], linestyle=linestyles_leadtimes[l], lw=1.0, ax=ax, label=of_method_txt + ' +' + str(int((t+1)*metadata["accutime"])) + ' min')
+                stp.plt.plot_spectrum1d(fft_freq, R_fct_spectrum, color=colors_of[c], linestyle=linestyles_leadtimes[l], lw=1.0, ax=ax, label=of_method_txt + ' +' + str(int((t+1)*metadata["accutime"])) + ' min')
                 l+=1
             c+=1
            

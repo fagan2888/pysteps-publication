@@ -180,7 +180,7 @@ for pei,pe in enumerate(precipevents):
             R_obs_shift *= window
             # Compute and plot RAPSD
             R_obs_spectrum, fft_freq = stp.utils.rapsd(R_obs_shift, np.fft, d=1.0, return_freq=True)
-            stp.plt.plot_rapsd(fft_freq, R_obs_spectrum, x_units='km', y_units='dBR', label='Observations', wavelength_ticks=wavelength_ticks, color='k', lw=1.0, ax=ax)
+            stp.plt.plot_spectrum1d(fft_freq, R_obs_spectrum, x_units='km', y_units='dBR', label='Observations', wavelength_ticks=wavelength_ticks, color='k', lw=1.0, ax=ax)
 
             # Plot Fourier spectra of forecasts
             colors=iter(cm.Blues_r(np.linspace(0,1,len(plot_leadtimes)+2)))
@@ -202,7 +202,7 @@ for pei,pe in enumerate(precipevents):
                     R_fct_spectrum, fft_freq = stp.utils.rapsd(R_fct_shift, np.fft, d=1.0, return_freq=True)
 
                 # Plot RAPSD
-                stp.plt.plot_rapsd(fft_freq, R_fct_spectrum, color=next(colors), lw=1.0, ax=ax, label='+' + str(int((t+1)*metadata["accutime"])) + ' min')
+                stp.plt.plot_spectrum1d(fft_freq, R_fct_spectrum, color=next(colors), lw=1.0, ax=ax, label='+' + str(int((t+1)*metadata["accutime"])) + ' min')
 
             # Decorate plot
             plt.legend(loc="lower left")

@@ -256,7 +256,7 @@ for startdate_str in events:
 
     ax = plt.subplot(gs[1,0])
     lw = 1.0
-    stp.plt.plot_rapsd(fft_freq, R_obs_accum_spectrum, x_units='km',
+    stp.plt.plot_spectrum1d(fft_freq, R_obs_accum_spectrum, x_units='km',
                        y_units='dBR', wavelength_ticks=wavelength_ticks,
                        color='k', lw=2.0, label='Observations', ax=ax)
     
@@ -351,16 +351,16 @@ for startdate_str in events:
             # ax = plt.subplot(n_rows,n_cols,n_cols+1)
             if (n_cascade_levels == 1) and  (precip_mask == True):
                 title_str = '1 levels + mask'
-                stp.plt.plot_rapsd(fft_freq, R_fct_accum_spectrum, color=cols[w], lw=1.0, label=title_str, ax=ax)
+                stp.plt.plot_spectrum1d(fft_freq, R_fct_accum_spectrum, color=cols[w], lw=1.0, label=title_str, ax=ax)
             if (n_cascade_levels > 1) and  (precip_mask == True):
                 title_str = str(n_cascade_levels) + ' levels + mask'
-                stp.plt.plot_rapsd(fft_freq, R_fct_accum_spectrum, color=cols[w], lw=1.0, label=title_str, ax=ax)
+                stp.plt.plot_spectrum1d(fft_freq, R_fct_accum_spectrum, color=cols[w], lw=1.0, label=title_str, ax=ax)
             if (n_cascade_levels == 1) and (precip_mask == False):
                 title_str = '1 levels - mask'
-                stp.plt.plot_rapsd(fft_freq, R_fct_accum_spectrum, color=cols[w], lw=1.0, label=title_str, ax=ax)
+                stp.plt.plot_spectrum1d(fft_freq, R_fct_accum_spectrum, color=cols[w], lw=1.0, label=title_str, ax=ax)
             if (n_cascade_levels > 1) and (precip_mask == False): 
                 title_str = str(n_cascade_levels) + ' levels - mask'
-                stp.plt.plot_rapsd(fft_freq, R_fct_accum_spectrum, color=cols[w], lw=1.0, label=title_str, ax=ax)
+                stp.plt.plot_spectrum1d(fft_freq, R_fct_accum_spectrum, color=cols[w], lw=1.0, label=title_str, ax=ax)
             if p == len(n_cascade_levels_l)*len(mask_method_l) + 2:
                 # Create legend
                 leg = ax.legend(fontsize=11, loc='lower left')
