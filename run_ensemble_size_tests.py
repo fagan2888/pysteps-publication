@@ -3,13 +3,14 @@
 # and 17 in the paper).
 
 from collections import defaultdict
-import dask
 from datetime import datetime, timedelta
-import numpy as np
 import os
 import pickle
 import sys
 import time
+import dask
+import numpy as np
+from scipy.ndimage.filters import uniform_filter
 from pysteps import io, motion, nowcasts, utils
 from pysteps.postprocessing.ensemblestats import excprob
 from pysteps.utils import conversion, transformation
@@ -25,6 +26,7 @@ num_workers = 6
 num_timesteps = 36
 R_min = 0.1
 R_thrs = [0.1, 1.0, 5.0, 10.0]
+upscale_factor = 2
 
 vp_par  = (2.31970635, 0.33734287, -2.64972861)
 vp_perp = (1.90769947, 0.33446594, -2.06603662)
@@ -40,6 +42,24 @@ root_path = os.path.join(datasources.root_path, datasource["root_path"])
 importer = io.get_method(datasource["importer"], "importer")
 
 results = {}
+
+def upscale_precip_field(R, sf):
+    if sf % 2 == 0:
+        origin = -1
+    else:
+        origin = 0
+
+    R = R.copy()
+    MASK = np.isfinite(R)
+    R[~MASK] = 0.0
+
+    R1 = uniform_filter(R, sf, origin=origin, mode="nearest")[::sf, ::sf]
+    R2 = uniform_filter(MASK.astype(float), sf, origin=origin, mode="nearest")[::sf, ::sf]
+
+    R_u =  R1 / R2
+    R_u[R2 < 0.5] = np.nan
+
+    return R_u
 
 for es in ensemble_sizes:
     results[es] = {}
@@ -76,6 +96,10 @@ for es in ensemble_sizes:
 
 R_min_dB = transformation.dB_transform(np.array([R_min]))[0][0]
 
+outfn = "ensemble_size_results_%s" % domain
+if upscale_factor > 1:
+    outfn += "_%d" % upscale_factor
+
 for pei,pe in enumerate(precipevents):
     curdate = datetime.strptime(pe[0], "%Y%m%d%H%M")
     enddate = datetime.strptime(pe[1], "%Y%m%d%H%M")
@@ -95,6 +119,11 @@ for pei,pe in enumerate(precipevents):
                                                   **datasource["importer_kwargs"])
         if domain == "fmi":
             R, metadata = conversion.to_rainrate(R, metadata, a=223.0, b=1.53)
+        if upscale_factor > 1:
+            R_ = []
+            for i in range(R.shape[0]):
+                R_.append(upscale_precip_field(R[i, :, :], upscale_factor))
+            R = np.stack(R_)
 
         missing_data = False
         for i in range(R.shape[0]):
@@ -130,6 +159,12 @@ for pei,pe in enumerate(precipevents):
         if domain == "fmi":
             R_obs, metadata = conversion.to_rainrate(R_obs, metadata, a=223.0, b=1.53)
 
+        if upscale_factor > 1:
+            R_ = []
+            for i in range(R_obs.shape[0]):
+                R_.append(upscale_precip_field(R_obs[i, :, :], upscale_factor))
+            R_obs = np.stack(R_)
+
         for es in ensemble_sizes:
             oflow = motion.get_method("lucaskanade")
             V = oflow(R[-2:, :, :])
@@ -137,10 +172,11 @@ for pei,pe in enumerate(precipevents):
             nc = nowcasts.get_method("steps")
             vel_pert_kwargs = {"p_par":vp_par , "p_perp":vp_perp}
             R_fct = nc(R[-3:, :, :], V, num_timesteps, n_ens_members=es,
-                       n_cascade_levels=8, R_thr=R_min_dB, kmperpixel=1.0,
-                       timestep=5, vel_pert_method="bps",
-                       mask_method="incremental", num_workers=num_workers,
-                       fft_method="pyfftw", vel_pert_kwargs=vel_pert_kwargs)
+                       n_cascade_levels=8, R_thr=R_min_dB,
+                       kmperpixel=1.0*upscale_factor, timestep=5,
+                       vel_pert_method="bps", mask_method="incremental",
+                       num_workers=num_workers, fft_method="pyfftw",
+                       vel_pert_kwargs=vel_pert_kwargs)
 
             for ei in range(R_fct.shape[0]):
                 for lt in range(R_fct.shape[1]):
@@ -200,10 +236,10 @@ for pei,pe in enumerate(precipevents):
                     res.append(dask.delayed(worker3)(lt, R_thr))
             dask.compute(*res, num_workers=num_workers)
 
-        with open("ensemble_size_results_%s.dat" % domain, "wb") as f:
+        with open(outfn + ".dat", "wb") as f:
             pickle.dump(results, f)
 
         curdate += timedelta(minutes=timestep)
 
-with open("ensemble_size_results_%s.dat" % domain, "wb") as f:
+with open(outfn + ".dat", "wb") as f:
     pickle.dump(results, f)
