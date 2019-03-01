@@ -12,12 +12,16 @@ linecolors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b",
               "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"]
 leadtimes = [5, 11, 23, 35]
 ensemble_size = 48
+upscale_factor = 1
 
-with open("ensemble_size_results_%s.dat" % domain, "rb") as f:
+infn = "ensemble_size_results_%s" % domain
+if upscale_factor > 1:
+    infn += "_%d" % upscale_factor
+with open(infn + ".dat", "rb") as f:
     results = pickle.load(f)
 
 for R_thr in results[ensemble_size]["ROC"].keys():
-    figure(figsize=(5, 3.5))
+    fig = figure(figsize=(5, 3.5))
 
     plot([0, 1], [0, 1], "k--")
 
@@ -34,7 +38,11 @@ for R_thr in results[ensemble_size]["ROC"].keys():
     grid(True)
     legend(fontsize=12, framealpha=1.0)
 
-    savefig("ROC_curves_%s_%.1f.pdf" % (domain, R_thr), bbox_inches="tight")
+    outfn = "ROC_curves_%s" % domain
+    if upscale_factor > 1:
+        outfn += "_%d" % upscale_factor
+    outfn += "_%.1f" % R_thr
+    fig.savefig(outfn + ".pdf", bbox_inches="tight")
 
 for R_thr in results[ensemble_size]["reldiag"].keys():
     fig = figure(figsize=(5, 3.5))
@@ -86,10 +94,14 @@ for R_thr in results[ensemble_size]["reldiag"].keys():
     ax.set_xlabel("Forecast probability", fontsize=12)
     ax.set_ylabel("Observed relative frequency", fontsize=12)
 
-    savefig("reldiags_%s_%.1f.pdf" % (domain, R_thr), bbox_inches="tight")
+    outfn = "reldiags_%s" % domain
+    if upscale_factor > 1:
+        outfn += "_%d" % upscale_factor
+    outfn += "_%.1f" % R_thr
+    fig.savefig(outfn + ".pdf", bbox_inches="tight")
 
 for R_thr in results[ensemble_size]["rankhist"].keys():
-    figure(figsize=(5, 3.5))
+    fig = figure(figsize=(5, 3.5))
 
     r_max = 0.0
     for i,lt in enumerate(leadtimes):
@@ -108,4 +120,8 @@ for R_thr in results[ensemble_size]["rankhist"].keys():
     grid(True, axis='y')
     legend(fontsize=12, framealpha=1.0, loc=10)
 
-    savefig("rankhists_%s_%.1f.pdf" % (domain, R_thr), bbox_inches="tight")
+    outfn = "rankhists_%s" % domain
+    if upscale_factor > 1:
+        outfn += "_%d" % upscale_factor
+    outfn += "_%.1f" % R_thr
+    fig.savefig(outfn + ".pdf", bbox_inches="tight")

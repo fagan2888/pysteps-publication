@@ -17,8 +17,12 @@ markers = [None, None, None, None, None]
 minleadtime = 5
 maxleadtime = 180
 R_thr = 0.1
+upscale_factor = 1
 
-with open("ensemble_size_results_%s.dat" % domain, "rb") as f:
+infn = "ensemble_size_results_%s" % domain
+if upscale_factor > 1:
+    infn += "_%d" % upscale_factor
+with open(infn + ".dat", "rb") as f:
     results = pickle.load(f)
 
 ETS = dict([(es, []) for es in sorted(results.keys())])
@@ -74,15 +78,17 @@ for i in range(3):
 
     if i == 0:
         ax.set_ylabel("ETS (mm/h)")
-        outfn = "ensemble_size_ETS_%s.pdf" % domain
+        outfn = "ensemble_size_ETS_%s" % domain
     elif i == 1:
         ax.set_ylabel("MAE (mm/h)")
-        outfn = "ensemble_size_MAE_%s.pdf" % domain
+        outfn = "ensemble_size_MAE_%s" % domain
     else:
         ax.set_ylabel("ME (mm/h)")
-        outfn = "ensemble_size_ME_%s.pdf" % domain
+        outfn = "ensemble_size_ME_%s" % domain
 
-    savefig(outfn, bbox_inches="tight")
+    if upscale_factor > 1:
+        outfn += "_%d" % upscale_factor
+    fig.savefig(outfn + ".pdf", bbox_inches="tight")
 
 fig = figure(figsize=(5, 3.5))
 ax = fig.gca()
@@ -98,7 +104,10 @@ ax.set_ylabel("CRPS (mm/h)")
 ax.grid(True)
 ax.legend(fontsize=12, framealpha=1.0)
 
-savefig("ensemble_size_CRPS_%s.pdf" % domain, bbox_inches="tight")
+outfn = "ensemble_size_CRPS_%s" % domain
+if upscale_factor > 1:
+    outfn += "_%d" % upscale_factor
+fig.savefig(outfn + ".pdf", bbox_inches="tight")
 
 fig = figure(figsize=(5, 3.5))
 ax = fig.gca()
@@ -116,7 +125,10 @@ ax.legend(fontsize=11, framealpha=1.0)
 ax.set_xlabel("Lead time (minutes)", fontsize=12)
 ax.set_ylabel("ROC area", fontsize=12)
 
-fig.savefig("ensemble_size_ROC_areas_%s.pdf" % domain, bbox_inches="tight")
+outfn = "ensemble_size_ROC_areas_%s" % domain
+if upscale_factor > 1:
+    outfn += "_%d" % upscale_factor
+fig.savefig(outfn + ".pdf", bbox_inches="tight")
 
 fig = figure(figsize=(5, 3.5))
 ax = fig.gca()
@@ -133,4 +145,7 @@ ax.legend(fontsize=12, framealpha=1.0, loc=(1.02, 0.3))
 ax.set_xlabel("Lead time (minutes)", fontsize=12)
 ax.set_ylabel("Percentage of outliers", fontsize=12)
 
-fig.savefig("ensemble_size_OP_%s.pdf" % domain, bbox_inches="tight")
+outfn = "ensemble_size_OP_%s" % domain
+if upscale_factor > 1:
+    outfn += "_%d" % upscale_factor
+fig.savefig(outfn + ".pdf", bbox_inches="tight")
