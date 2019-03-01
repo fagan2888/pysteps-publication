@@ -88,6 +88,7 @@ for i in range(3):
 
     if upscale_factor > 1:
         outfn += "_%d" % upscale_factor
+    outfn += "_%.1f" % R_thr
     fig.savefig(outfn + ".pdf", bbox_inches="tight")
 
 fig = figure(figsize=(5, 3.5))
@@ -107,6 +108,7 @@ ax.legend(fontsize=12, framealpha=1.0)
 outfn = "ensemble_size_CRPS_%s" % domain
 if upscale_factor > 1:
     outfn += "_%d" % upscale_factor
+outfn += "_%.1f" % R_thr
 fig.savefig(outfn + ".pdf", bbox_inches="tight")
 
 fig = figure(figsize=(5, 3.5))
@@ -128,6 +130,7 @@ ax.set_ylabel("ROC area", fontsize=12)
 outfn = "ensemble_size_ROC_areas_%s" % domain
 if upscale_factor > 1:
     outfn += "_%d" % upscale_factor
+outfn += "_%.1f" % R_thr
 fig.savefig(outfn + ".pdf", bbox_inches="tight")
 
 fig = figure(figsize=(5, 3.5))
@@ -148,4 +151,5 @@ ax.set_ylabel("Percentage of outliers", fontsize=12)
 outfn = "ensemble_size_OP_%s" % domain
 if upscale_factor > 1:
     outfn += "_%d" % upscale_factor
+outfn += "_%.1f" % R_thr
 fig.savefig(outfn + ".pdf", bbox_inches="tight")
