@@ -10,9 +10,13 @@ from pysteps.verification import ensscores, probscores
 domain = "mch"
 linecolors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", 
               "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"]
-leadtimes = [5, 11, 23, 35]
 ensemble_size = 48
 upscale_factor = 1
+
+leadtimes = {0.1: [5, 11, 23, 35],
+             1.0: [5, 11, 23, 35],
+             5.0: [2, 5, 8],
+             10.0: [2, 5, 8]}
 
 infn = "ensemble_size_results_%s" % domain
 if upscale_factor > 1:
@@ -25,7 +29,7 @@ for R_thr in results[ensemble_size]["ROC"].keys():
 
     plot([0, 1], [0, 1], "k--")
 
-    for i,lt in enumerate(leadtimes):
+    for i,lt in enumerate(leadtimes[R_thr]):
         ROC = results[ensemble_size]["ROC"][R_thr][lt]
         POFD,POD,area = probscores.ROC_curve_compute(ROC, compute_area=True)
         plot(POFD, POD, color=linecolors[i], lw=2, #linestyle='-', marker='D', 
@@ -36,7 +40,7 @@ for R_thr in results[ensemble_size]["ROC"].keys():
     xlabel("False alarm rate (POFD)", fontsize=12)
     ylabel("Probability of detection (POD)", fontsize=12)
     grid(True)
-    legend(fontsize=12, framealpha=1.0)
+    legend(fontsize=12, loc=4, framealpha=1.0)
 
     outfn = "ROC_curves_%s" % domain
     if upscale_factor > 1:
@@ -47,12 +51,12 @@ for R_thr in results[ensemble_size]["ROC"].keys():
 for R_thr in results[ensemble_size]["reldiag"].keys():
     fig = figure(figsize=(5, 3.5))
     ax = fig.gca()
-    iax = inset_axes(ax, width="35%", height="20%", loc=4, borderpad=3.5)
+    iax = inset_axes(ax, width="35%", height="20%", loc=2, borderpad=2.0)
 
     sample_size_min = []
     sample_size_max = []
 
-    for i,lt in enumerate(leadtimes):
+    for i,lt in enumerate(leadtimes[R_thr]):
         reldiag = results[ensemble_size]["reldiag"][R_thr][lt]
 
         f = 1.0 * reldiag["Y_sum"] / reldiag["num_idx"]
@@ -90,7 +94,7 @@ for R_thr in results[ensemble_size]["reldiag"].keys():
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
     ax.grid(True)
-    ax.legend(fontsize=12, framealpha=1.0)
+    ax.legend(fontsize=12, loc=4, framealpha=1.0)
     ax.set_xlabel("Forecast probability", fontsize=12)
     ax.set_ylabel("Observed relative frequency", fontsize=12)
 
@@ -104,21 +108,21 @@ for R_thr in results[ensemble_size]["rankhist"].keys():
     fig = figure(figsize=(5, 3.5))
 
     r_max = 0.0
-    for i,lt in enumerate(leadtimes):
+    for i,lt in enumerate(leadtimes[R_thr]):
         rankhist = results[ensemble_size]["rankhist"][R_thr][lt]
         r = ensscores.rankhist_compute(rankhist)
         r_max = max(r_max, np.max(r))
         x = np.linspace(0, 1, rankhist["num_ens_members"] + 1)
         x += 0.5 * (x[1] - x[0])
-        plot(x, r, color=linecolors[i], label="%d minutes" % ((lt+1)*5))
+        plot(x, r, color=linecolors[i], label="%d minutes" % ((lt+1)*5), lw=2)
 
     xticks(x[::3] + (x[1] - x[0]), np.arange(1, len(x))[::3])
     xlim(0.5*(x[1]-x[0]), 1+1.0/len(x)-0.5*(x[1]-x[0]))
-    ylim(0, r_max*1.25)
+    ylim(0, r_max*1.1)
     xlabel("Rank of observation (among ensemble members)", fontsize=12)
     ylabel("Relative frequency", fontsize=12)
     grid(True, axis='y')
-    legend(fontsize=12, framealpha=1.0, loc=10)
+    legend(fontsize=12, loc=10, framealpha=1.0)
 
     outfn = "rankhists_%s" % domain
     if upscale_factor > 1:
