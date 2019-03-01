@@ -10,9 +10,8 @@ from pysteps.verification import ensscores, probscores
 domain = "mch"
 linecolors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", 
               "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"]
-#leadtimes = [15, 30, 60, 90]
-leadtimes = [2, 11, 17, 23]
-ensemble_size = 24
+leadtimes = [5, 11, 23, 35]
+ensemble_size = 48
 
 with open("ensemble_size_results_%s.dat" % domain, "rb") as f:
     results = pickle.load(f)
@@ -25,17 +24,17 @@ for R_thr in results[ensemble_size]["ROC"].keys():
     for i,lt in enumerate(leadtimes):
         ROC = results[ensemble_size]["ROC"][R_thr][lt]
         POFD,POD,area = probscores.ROC_curve_compute(ROC, compute_area=True)
-        plot(POFD, POD, color=linecolors[i], linestyle='-', marker='D', 
+        plot(POFD, POD, color=linecolors[i], lw=2, #linestyle='-', marker='D', 
              label="%d minutes (area=%.2f)" % (((lt+1)*5), area))
 
     xlim(0, 1)
     ylim(0, 1)
-    xlabel("False alarm rate (POFD)")
-    ylabel("Probability of detection (POD)")
+    xlabel("False alarm rate (POFD)", fontsize=12)
+    ylabel("Probability of detection (POD)", fontsize=12)
     grid(True)
     legend(fontsize=12, framealpha=1.0)
 
-    savefig("ROC_curves_%.1f.pdf" % R_thr, bbox_inches="tight")
+    savefig("ROC_curves_%s_%.1f.pdf" % (domain, R_thr), bbox_inches="tight")
 
 for R_thr in results[ensemble_size]["reldiag"].keys():
     fig = figure(figsize=(5, 3.5))
@@ -84,10 +83,10 @@ for R_thr in results[ensemble_size]["reldiag"].keys():
     ax.set_ylim(0, 1)
     ax.grid(True)
     ax.legend(fontsize=12, framealpha=1.0)
-    ax.set_xlabel("Forecast probability")
-    ax.set_ylabel("Observed relative frequency")
+    ax.set_xlabel("Forecast probability", fontsize=12)
+    ax.set_ylabel("Observed relative frequency", fontsize=12)
 
-    savefig("reldiags_%.1f.pdf" % R_thr, bbox_inches="tight")
+    savefig("reldiags_%s_%.1f.pdf" % (domain, R_thr), bbox_inches="tight")
 
 for R_thr in results[ensemble_size]["rankhist"].keys():
     figure(figsize=(5, 3.5))
@@ -99,15 +98,14 @@ for R_thr in results[ensemble_size]["rankhist"].keys():
         r_max = max(r_max, np.max(r))
         x = np.linspace(0, 1, rankhist["num_ens_members"] + 1)
         x += 0.5 * (x[1] - x[0])
-        plot(x, r, color=linecolors[i], linestyle='-', marker='D', 
-             label="%d minutes" % ((lt+1)*5))
+        plot(x, r, color=linecolors[i], label="%d minutes" % ((lt+1)*5))
 
     xticks(x[::3] + (x[1] - x[0]), np.arange(1, len(x))[::3])
-    xlim(0, 1+1.0/len(x))
+    xlim(0.5*(x[1]-x[0]), 1+1.0/len(x)-0.5*(x[1]-x[0]))
     ylim(0, r_max*1.25)
-    xlabel("Rank of observation (among ensemble members)")
-    ylabel("Relative frequency")
+    xlabel("Rank of observation (among ensemble members)", fontsize=12)
+    ylabel("Relative frequency", fontsize=12)
     grid(True, axis='y')
-    legend(fontsize=12, framealpha=1.0)
+    legend(fontsize=12, framealpha=1.0, loc=10)
 
-    savefig("rankhists_%.1f.pdf" % R_thr, bbox_inches="tight")
+    savefig("rankhists_%s_%.1f.pdf" % (domain, R_thr), bbox_inches="tight")

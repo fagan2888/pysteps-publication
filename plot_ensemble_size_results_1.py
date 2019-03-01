@@ -11,7 +11,8 @@ linecolors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b",
               "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"]
 linestyles = ['-', '-', '-', '-', '-']
 #markers = ['o', 's', 'd', '^']
-markers = ['o', 'o', 'o', 'o', 'o']
+#markers = ['o', 'o', 'o', 'o', 'o']
+markers = [None, None, None, None, None]
 #markers = ["circle", "cross", "diamond", "square", "triangle-down", "triangle-up"]
 minleadtime = 5
 maxleadtime = 180
@@ -63,8 +64,8 @@ for i in range(3):
             values = ME[es]
 
         leadtimes = (np.array(sorted(results[es]["MAE"][R_thr].keys())) + 1) * 5
-        ax.plot(leadtimes, values, ls=linestyles[j], marker=markers[j],
-                label="n=%d" % es)
+        ax.plot(leadtimes, values, ls=linestyles[j], marker=markers[j], lw=2,
+                ms=6, label="n=%d" % es)
 
     ax.set_xlim(minleadtime, maxleadtime)
     ax.set_xlabel("Lead time (minutes)")
@@ -73,13 +74,13 @@ for i in range(3):
 
     if i == 0:
         ax.set_ylabel("ETS (mm/h)")
-        outfn = "ensemble_size_ETS.pdf"
+        outfn = "ensemble_size_ETS_%s.pdf" % domain
     elif i == 1:
         ax.set_ylabel("MAE (mm/h)")
-        outfn = "ensemble_size_MAE.pdf"
+        outfn = "ensemble_size_MAE_%s.pdf" % domain
     else:
         ax.set_ylabel("ME (mm/h)")
-        outfn = "ensemble_size_ME.pdf"
+        outfn = "ensemble_size_ME_%s.pdf" % domain
 
     savefig(outfn, bbox_inches="tight")
 
@@ -88,7 +89,7 @@ ax = fig.gca()
 
 for i,es in enumerate(sorted(results.keys())):
   leadtimes = (np.array(sorted(results[es]["CRPS"].keys())) + 1) * 5
-  ax.plot(leadtimes, CRPS[es], ls=linestyles[i], marker=markers[i],
+  ax.plot(leadtimes, CRPS[es], ls=linestyles[i], marker=markers[i], lw=2, ms=6,
           label="n=%d" % es)
 
 ax.set_xlim(minleadtime, maxleadtime)
@@ -97,7 +98,7 @@ ax.set_ylabel("CRPS (mm/h)")
 ax.grid(True)
 ax.legend(fontsize=12, framealpha=1.0)
 
-savefig("ensemble_size_CRPS.pdf", bbox_inches="tight")
+savefig("ensemble_size_CRPS_%s.pdf" % domain, bbox_inches="tight")
 
 fig = figure(figsize=(5, 3.5))
 ax = fig.gca()
@@ -109,13 +110,13 @@ for i,es in enumerate(sorted(ROC_areas.keys())):
 xt = np.hstack([5, np.arange(20, maxleadtime+20, 20)])
 ax.set_xticks(xt)
 ax.set_xlim(minleadtime, maxleadtime)
-ax.set_ylim(0.7, 1.0)
+ax.set_ylim(0.59, 1.0)
 ax.grid(True)
-ax.legend(fontsize=12, framealpha=1.0)
+ax.legend(fontsize=11, framealpha=1.0)
 ax.set_xlabel("Lead time (minutes)", fontsize=12)
 ax.set_ylabel("ROC area", fontsize=12)
 
-fig.savefig("ensemble_size_ROC_areas.pdf", bbox_inches="tight")
+fig.savefig("ensemble_size_ROC_areas_%s.pdf" % domain, bbox_inches="tight")
 
 fig = figure(figsize=(5, 3.5))
 ax = fig.gca()
@@ -126,10 +127,10 @@ for i,es in enumerate(sorted(OP.keys())):
 xt = np.hstack([5, np.arange(20, maxleadtime+20, 20)])
 ax.set_xticks(xt)
 ax.set_xlim(minleadtime, maxleadtime)
-ax.set_ylim(0.0, 0.4)
+ax.set_ylim(0.0, 0.47)
 ax.grid(True)
 ax.legend(fontsize=12, framealpha=1.0, loc=(1.02, 0.3))
 ax.set_xlabel("Lead time (minutes)", fontsize=12)
 ax.set_ylabel("Percentage of outliers", fontsize=12)
 
-fig.savefig("ensemble_size_OP.pdf", bbox_inches="tight")
+fig.savefig("ensemble_size_OP_%s.pdf" % domain, bbox_inches="tight")
