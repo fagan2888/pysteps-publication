@@ -26,7 +26,7 @@ num_workers = 6
 num_timesteps = 36
 R_min = 0.1
 R_thrs = [0.1, 1.0, 5.0, 10.0]
-upscale_factor = 2
+upscale_factor = 1
 
 vp_par  = (2.31970635, 0.33734287, -2.64972861)
 vp_perp = (1.90769947, 0.33446594, -2.06603662)
