@@ -1,6 +1,6 @@
 '''
-Script to analyze the temporal correlation of stochastic ensemble members and observations
-in Lagrangian frame at different spatial scales
+Script to analyze the temporal auto-correlation of stochastic ensemble members 
+and observations in Lagrangian frame at different spatial scales.
 '''
 from collections import defaultdict
 from datetime import datetime, timedelta
@@ -10,6 +10,7 @@ import sys
 import numpy as np
 from pysteps import rcparams, cascade, extrapolation, io, motion, utils, nowcasts
 from pysteps.timeseries import autoregression
+import matplotlib.pyplot as plt
 
 sys.path.insert(0,'..')
 import precipevents
@@ -19,13 +20,15 @@ domain = "mch_hdf5"
 timestep = 240
 
 # Experiment parameters
-n_levels              = 8       # to produce the nowcast [1 or 8]
-n_levels_verif        = 8       # to verify the nowcast [keep it fixed]
-recompute_flow        = False   # whether to recompute the flow of the fct/obs fields (very slow)
+n_levels        = 1       # to produce the nowcast [1 or 8]
+n_levels_verif  = 8       # to verify the nowcast [keep it fixed]
+recompute_flow  = False   # whether to recompute the flow of the fct/obs fields (very slow)
+
+nsteps_ar       = 10000   # number of steps to integrate the full ACF
 
 # Forecast parameters
-n_lead_times        = 36
-n_members           = 24
+n_lead_times        = 24
+n_members           = 1
 ar_order            = 2
 oflow_method        = "lucaskanade"
 filter              = "nonparametric"
@@ -44,29 +47,29 @@ if domain == "fmi":
 if domain[0:3] == "mch":
     precipevents = precipevents.mch
     # only 1 event (comment out if you want all events)
-    precipevents = [("201701311000", "201701311400")]
+    # precipevents = [("201701311000", "201701311400")]
 
 datasource = rcparams.data_sources[domain]
 root_path = datasource["root_path"]
 importer = io.get_method(datasource["importer"], "importer")
 
 oflow = motion.get_method(oflow_method)
-extrap_init = extrapolation.get_method("semilagrangian")[0]
+extrapolator = extrapolation.get_method("semilagrangian")
 nc = nowcasts.steps.forecast
 
-extrapolator = None
+#extrapolator = None
 filter_verif = None
 bandpass_filter = 'uniform' if (n_levels == 1) else 'gaussian'
 
 # Dictionary containing the sum of temporal autocorrelation functions
 results = {}
-results["leadtimes"] = (np.arange(n_lead_times)+1) * datasource["timestep"]
+results["leadtimes"] = (np.arange(nsteps_ar)+1) * datasource["timestep"]
 results["timestep"] = datasource["timestep"]
 
-results["cc_fct"] = [np.zeros(n_lead_times) for i in range(n_levels_verif)]
-results["cc_obs"] = [np.zeros(n_lead_times) for i in range(n_levels_verif)]
-results["n_fct_samples"] = [np.zeros(n_lead_times, dtype=int) for i in range(n_levels_verif)]
-results["n_obs_samples"] = [np.zeros(n_lead_times, dtype=int) for i in range(n_levels_verif)]
+results["cc_fct"] = [np.zeros(nsteps_ar) for i in range(n_levels_verif)] 
+results["cc_obs"] = [np.zeros(nsteps_ar) for i in range(n_levels_verif)]
+results["n_fct_samples"] = [np.zeros(nsteps_ar, dtype=int) for i in range(n_levels_verif)]
+results["n_obs_samples"] = [np.zeros(nsteps_ar, dtype=int) for i in range(n_levels_verif)]
 
 for pei,pe in enumerate(precipevents):
     curdate = datetime.strptime(pe[0], "%Y%m%d%H%M")
@@ -127,17 +130,18 @@ for pei,pe in enumerate(precipevents):
         # Replace nans and set zeros
         R_fct[np.isnan(R_fct)] = metadata_dbr["zerovalue"]
         R_fct[R_fct < metadata_dbr["threshold"]] = metadata_dbr["zerovalue"]
-            
+           
         ## Derive AR-2 ACF from forecast sequences
-        print("Verifying temporal ACF of nowcasts...")
-        if extrapolator is None:
-            extrapolator = extrap_init(shape=R.shape[1:])
+        print('-------------------------------------')
+        print("Computing ACF of nowcasts...")
         if filter_verif is None:
             if n_levels_verif == 1:
                 filter_verif = cascade.bandpass_filters.filter_uniform(R.shape[1:], n_levels_verif)
             else:
-                filter_verif = cascade.bandpass_filters.filter_gaussian(R.shape[1:], n_levels_verif)
-                
+                filter_verif = cascade.bandpass_filters.filter_gaussian(R.shape[1:], n_levels_verif, d=metadata["xpixelsize"]/1000.0) 
+                central_wavelengths_km = 1.0/filter_verif["central_freqs"]
+            results["central_wavelengths"] = central_wavelengths_km
+            
         n_steps = n_lead_times-ar_order
         for lt in range(0, n_steps):
             print('Lead time:', lt)
@@ -146,43 +150,25 @@ for pei,pe in enumerate(precipevents):
                 if recompute_flow:
                     UV = oflow(R_fct[m,lt:lt+2,:,:])
                 # Put in Lagrangian coordinates the three forecast images
-                R_minus_2 = extrapolation.semilagrangian.extrapolate(extrapolator, R_fct[m,lt, :, :], UV, 2, outval=zero_value_dbr)[-1, :, :]
-                R_minus_1 = extrapolation.semilagrangian.extrapolate(extrapolator, R_fct[m,lt+1, :, :], UV, 1, outval=zero_value_dbr)[-1, :, :]
+                R_minus_2 = extrapolation.semilagrangian.extrapolate(R_fct[m,lt, :, :], UV, 2, outval=zero_value_dbr)[-1, :, :]
+                R_minus_1 = extrapolation.semilagrangian.extrapolate(R_fct[m,lt+1, :, :], UV, 1, outval=zero_value_dbr)[-1, :, :]
                 
                 # Cascade decomposition
                 c1 = cascade.decomposition.decomposition_fft(R_minus_2, filter_verif)
                 c2 = cascade.decomposition.decomposition_fft(R_minus_1, filter_verif)
                 c3 = cascade.decomposition.decomposition_fft(R_fct[m,lt+2, :, :], filter_verif)
                 
-                # Compute autocorrelation coefficients at each level
-                gamma = []
-                phi = []
+                # Compute autocorrelation coefficients and function at each level
                 for i in range(n_levels_verif):
                     gamma_1 = np.corrcoef(c3["cascade_levels"][i, :, :].flatten(),
                                           c2["cascade_levels"][i, :, :].flatten())[0, 1]
                     gamma_2 = np.corrcoef(c3["cascade_levels"][i, :, :].flatten(),
                                           c1["cascade_levels"][i, :, :].flatten())[0, 1]
                     gamma_2 = autoregression.adjust_lag2_corrcoef2(gamma_1, gamma_2)
-                    gamma.append((gamma_1, gamma_2))
-
-                    phi.append(autoregression.estimate_ar_params_yw((gamma_1, gamma_2))[0:2])
-                
-                # Derive full autocorrelation function (assuming AR2 process)
-                for i in range(n_levels_verif):
-                    k = 0
-                    for t in range(n_lead_times):
-                        # TODO: Implement this for a higher-order AR(p) model.
-                        if k == 0:
-                            rho = [np.nan, gamma[i][0]]
-                        elif k == 1:
-                            rho = [gamma[i][0], gamma[i][1]]
-                        else:
-                            rho.append(rho[1] * phi[i][0] + rho[0] * phi[i][1])
-                            rho.pop(0)
-                        if np.isfinite(rho[1]):
-                          results["cc_fct"][i][t] += rho[1]
-                          results["n_fct_samples"][i][t] += 1
-                        k += 1
+                    acf = autoregression.ar_acf([gamma_1,gamma_2], n=nsteps_ar)
+                    
+                    results["cc_fct"][i] += np.array(acf)
+                    results["n_fct_samples"][i] += 1
 
         # Do the same analysis with observations
         obs_fns = io.archive.find_by_date(curdate, root_path, datasource["path_fmt"],
@@ -207,9 +193,7 @@ for pei,pe in enumerate(precipevents):
         R_obs, metadata_obs_dbr = utils.dB_transform(R_obs, metadata_obs, zerovalue=zero_value_dbr)
         
         ## Derive AR-2 ACF from observed sequences
-        print("Verifying temporal ACF of observations...")
-        if extrapolator is None:
-            extrapolator = extrap_init(shape=R.shape[1:])
+        print("Computing ACF of observations...")
         if filter_verif is None:
             if num_cascade_levels == 1:
                 filter_verif = cascade.bandpass_filters.filter_uniform(R.shape[1:], n_levels_verif)
@@ -222,8 +206,8 @@ for pei,pe in enumerate(precipevents):
             if recompute_flow:
                 UV = oflow(R_obs[lt:lt+2,:,:])
             # Put in Lagrangian coordinates the three observed images
-            R_minus_2 = extrapolation.semilagrangian.extrapolate(extrapolator, R_obs[lt, :, :], UV, 2, outval=zero_value_dbr)[-1, :, :]
-            R_minus_1 = extrapolation.semilagrangian.extrapolate(extrapolator, R_obs[lt+1, :, :], UV, 1, outval=zero_value_dbr)[-1, :, :]
+            R_minus_2 = extrapolation.semilagrangian.extrapolate(R_obs[lt, :, :], UV, 2, outval=zero_value_dbr)[-1, :, :]
+            R_minus_1 = extrapolation.semilagrangian.extrapolate(R_obs[lt+1, :, :], UV, 1, outval=zero_value_dbr)[-1, :, :]
             
             # Cascade decomposition
             c1 = cascade.decomposition.decomposition_fft(R_minus_2, filter_verif)
@@ -231,39 +215,20 @@ for pei,pe in enumerate(precipevents):
             c3 = cascade.decomposition.decomposition_fft(R_obs[lt+2, :, :], filter_verif)
             
             # Compute autocorrelation coefficients
-            gamma = []
-            phi = []
             for i in range(n_levels_verif):
                 gamma_1 = np.corrcoef(c3["cascade_levels"][i, :, :].flatten(),
                                       c2["cascade_levels"][i, :, :].flatten())[0, 1]
                 gamma_2 = np.corrcoef(c3["cascade_levels"][i, :, :].flatten(),
                                       c1["cascade_levels"][i, :, :].flatten())[0, 1]
                 gamma_2 = autoregression.adjust_lag2_corrcoef2(gamma_1, gamma_2)
-                gamma.append((gamma_1, gamma_2))
-
-                phi.append(autoregression.estimate_ar_params_yw((gamma_1, gamma_2))[0:2])
-            
-            # Derive full autocorrelation function
-            for i in range(n_levels_verif):
-                k = 0
-                for t in range(n_lead_times):
-                    # TODO: Implement this for a higher-order AR(p) model.
-                    if k == 0:
-                        rho = [np.nan, gamma[i][0]]
-                    elif k == 1:
-                        rho = [gamma[i][0], gamma[i][1]]
-                    else:
-                        rho.append(rho[1] * phi[i][0] + rho[0] * phi[i][1])
-                        rho.pop(0)
-                    if np.isfinite(rho[1]):
-                      results["cc_obs"][i][t] += rho[1]
-                      results["n_obs_samples"][i][t] += 1
-                    k += 1
-
+                acf_obs = autoregression.ar_acf([gamma_1, gamma_2],n=nsteps_ar)
+                
+                results["cc_obs"][i] += np.array(acf_obs)
+                results["n_obs_samples"][i] += 1
+                
         print("Done.")
 
         curdate += timedelta(minutes=timestep)
-        
         with open(filename_out, "wb") as f:
             pickle.dump(results, f)
 
