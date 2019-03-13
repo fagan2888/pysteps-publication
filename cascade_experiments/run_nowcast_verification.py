@@ -18,8 +18,7 @@ import sys
 from pysteps import rcparams, io, motion, nowcasts, utils
 from pysteps.postprocessing.ensemblestats import excprob
 from pysteps.utils import transformation, conversion
-from pysteps.verification import ensscores
-from pysteps.verification import probscores
+from pysteps.verification import ensscores, probscores
 from pysteps.utils import aggregate_fields_space, clip_domain
 
 # Data
@@ -33,18 +32,18 @@ if data_source == "fmi":
     precipevents = precipevents.fmi
     # only one event (comment out if you want all events)
     precipevents = [("201609291000", "201609291800")]
-if data_source == "mch_hdf5":
+if data_source[0:3] == "mch":
     # all events
     precipevents = precipevents.mch
     # only 1 event (comment out if you want all events)
-    # precipevents = [("201701311000", "201701311000")]
+    precipevents = [("201701311000", "201701311800")]
 
 # Cascade experiments
 cascade_levels = [1,8]
 mask_methods = ['incremental', None]
 
 # Forecast parameters
-timestep = 30
+timestep = 240
 R_min = 0.1
 
 num_timesteps = 12
@@ -59,6 +58,7 @@ filename_verif_base = "data/" + data_source[0:3] + "_cascade_results"
 R_thrs = [0.1, 1.0, 5.0]            # Rainfall thresholds to verify (same applies for accumulations)
 v_scales_km = [1, 10, 40]           # Spatial scales to verify [km] (must be divisors of clipped grid size)
 v_accu_min = 5                     # Temporal accumulation to verify [min]. Only one value possible
+spread_skill_metric = "RMSE_add"
 
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++# 
 # Lead times to verify [min]
@@ -98,19 +98,28 @@ badts2016 = np.loadtxt("/store/msrad/radar/precip_attractor/radar_availability/A
 badts2017 = np.loadtxt("/store/msrad/radar/precip_attractor/radar_availability/AQC-2017_radar-stats-badTimestamps_00005.txt", dtype="str")
 badts = np.concatenate((badts2016, badts2017))
 
-# Instantiate dictionary containing the verification results
+# Initialize dictionary containing the verification results
 results = {}
 results["metadata"] = {}
 results["metadata"]["v_accu_min"] = v_accu_min
 results["metadata"]["v_leadtimes"] = v_leadtimes
 results["metadata"]["v_scales_km"] = v_scales_km
 
+skill_varname = spread_skill_metric + "_skill"
+spread_varname = spread_skill_metric + "_spread"
 for c in cascade_levels:
     for m in mask_methods:
         results[c,m] = {}
         results[c,m]["reldiag"] = {}
         results[c,m]["rankhist"] = {}
         results[c,m]["ROC"] = {}
+        results[c,m]["CRPS"] = {}
+        results[c,m][skill_varname] = {}
+        results[c,m][spread_varname] = {}
+        # Only for lowest threshold
+        results[c,m]["CRPS"][R_thrs[0]] = {}
+        results[c,m][skill_varname][R_thrs[0]] = {}
+        results[c,m][spread_varname][R_thrs[0]] = {}
         for R_thr in R_thrs:
             results[c,m]["reldiag"][R_thr] = {}
             results[c,m]["rankhist"][R_thr] = {}
@@ -119,10 +128,18 @@ for c in cascade_levels:
                 results[c,m]["reldiag"][R_thr][scale_km] = {}
                 results[c,m]["rankhist"][R_thr][scale_km] = {}
                 results[c,m]["ROC"][R_thr][scale_km] = {}
+                # Only for lowest threshold
+                results[c,m]["CRPS"][R_thrs[0]][scale_km] = {}
+                results[c,m][skill_varname][R_thrs[0]][scale_km] = {}
+                results[c,m][spread_varname][R_thrs[0]][scale_km] = {}
                 for lt in v_leadtimes:
                     results[c,m]["reldiag"][R_thr][scale_km][lt] = probscores.reldiag_init(R_thr, n_bins=10)
                     results[c,m]["rankhist"][R_thr][scale_km][lt] = ensscores.rankhist_init(ensemble_size, R_thr)
                     results[c,m]["ROC"][R_thr][scale_km][lt] = probscores.ROC_curve_init(R_thr, n_prob_thrs=100)
+                    # Only for lowest threshold
+                    results[c,m]["CRPS"][R_thrs[0]][scale_km][lt] = probscores.CRPS_init()
+                    results[c,m][skill_varname][R_thrs[0]][scale_km][lt] = {"sum": 0.0, "n": 0}
+                    results[c,m][spread_varname][R_thrs[0]][scale_km][lt] = {"sum": 0.0, "n": 0}
 
 for pei,pe in enumerate(precipevents):
     curdate = datetime.strptime(pe[0], "%Y%m%d%H%M")
@@ -229,7 +246,7 @@ for pei,pe in enumerate(precipevents):
                     metafct_accum["threshold"] = R_min
                 
                 # Clip domain
-                if domain[0:3] == 'mch':
+                if data_source[0:3] == 'mch':
                     xlim = [400000, 840000]
                     ylim = [-50000, 350000]
                     extent = (xlim[0], xlim[1], ylim[0], ylim[1]) 
@@ -241,33 +258,43 @@ for pei,pe in enumerate(precipevents):
                 
                 # Verify nowcasts
                 print("Verifying nowcasts...")
-                def worker(lt, R_thr, scale_km):
+                def worker(lt, scale_km):
                     lt_idx = int(lt/v_accu_min - 1)
                     if not np.any(np.isfinite(R_obs_c[lt_idx, :, :])):
                         return 
-                    # print(c,m,R_thr,scale_km,lt,lt_idx)                    
+                        
                     R_fct_s,_ = aggregate_fields_space(R_fct_c, metafct_c, scale_km*1000, ignore_nan=False)
                     R_obs_s,_ = aggregate_fields_space(R_obs_c, metaobs_c, scale_km*1000, ignore_nan=False)
                     
-                    P_fct = excprob(R_fct_s[:, lt_idx, :, :], R_thr, ignore_nan=True)
+                    for R_thr in R_thrs:
+                        P_fct = excprob(R_fct_s[:, lt_idx, :, :], R_thr, ignore_nan=True)
+                        
+                        probscores.reldiag_accum(results[c,m]["reldiag"][R_thr][scale_km][lt], 
+                                                P_fct, R_obs_s[lt_idx, :, :])
+                        ensscores.rankhist_accum(results[c,m]["rankhist"][R_thr][scale_km][lt], 
+                                                R_fct_s[:, lt_idx, :, :], R_obs_s[lt_idx, :, :])
+                        probscores.ROC_curve_accum(results[c,m]["ROC"][R_thr][scale_km][lt], 
+                                                P_fct, R_obs_s[lt_idx, :, :])
+                    # Only for lowest threshold
+                    probscores.CRPS_accum(results[c,m]["CRPS"][R_thrs[0]][scale_km][lt], 
+                                            R_fct_s[:, lt_idx, :, :], R_obs_s[lt_idx, :, :])
+                    results[c,m][skill_varname][R_thrs[0]][scale_km][lt]["sum"] +=\
+                        ensscores.ensemble_skill(R_fct_s[:, lt_idx, :, :],R_obs_s[lt_idx, :, :],spread_skill_metric)
+                    results[c,m][spread_varname][R_thrs[0]][scale_km][lt]["sum"] +=\
+                        ensscores.ensemble_spread(R_fct_s[:, lt_idx, :, :],spread_skill_metric)
+                    results[c,m][skill_varname][R_thrs[0]][scale_km][lt]["n"] += 1
+                    results[c,m][spread_varname][R_thrs[0]][scale_km][lt]["n"] += 1
                     
-                    probscores.reldiag_accum(results[c,m]["reldiag"][R_thr][scale_km][lt], 
-                                             P_fct, R_obs_s[lt_idx, :, :])
-                    ensscores.rankhist_accum(results[c,m]["rankhist"][R_thr][scale_km][lt], 
-                                             R_fct_s[:, lt_idx, :, :], R_obs_s[lt_idx, :, :])
-                    probscores.ROC_curve_accum(results[c,m]["ROC"][R_thr][scale_km][lt], 
-                                               P_fct, R_obs_s[lt_idx, :, :])
                 res = []
-                for R_thr in R_thrs:
-                    for scale_km in v_scales_km:
-                        for lt in v_leadtimes:
-                            lt_idx = int(lt/v_accu_min - 1)
-                            missing_data = np.all(~np.isfinite(R_obs[lt_idx, :, :]))
-                            low_quality = metaobs["timestamps"][lt_idx].strftime("%Y%m%d%H%M") in badts
-                            if missing_data or low_quality:
-                                print("Warning: no verifying observations for lead time %d." % (lt))
-                                continue
-                            res.append(dask.delayed(worker)(lt, R_thr, scale_km))
+                for scale_km in v_scales_km:
+                    for lt in v_leadtimes:
+                        lt_idx = int(lt/v_accu_min - 1)
+                        missing_data = np.all(~np.isfinite(R_obs[lt_idx, :, :]))
+                        low_quality = metaobs["timestamps"][lt_idx].strftime("%Y%m%d%H%M") in badts
+                        if missing_data or low_quality:
+                            print("Warning: no verifying observations for lead time %d." % (lt))
+                            continue
+                        res.append(dask.delayed(worker)(lt, scale_km))
                 dask.compute(*res, num_workers=num_workers)
                 
                 toc = time.time()
