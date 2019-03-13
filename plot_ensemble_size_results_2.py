@@ -33,7 +33,15 @@ for R_thr in results[ensemble_size]["ROC"].keys():
         ROC = results[ensemble_size]["ROC"][R_thr][lt]
         POFD,POD,area = probscores.ROC_curve_compute(ROC, compute_area=True)
         plot(POFD, POD, color=linecolors[i], lw=2, #linestyle='-', marker='D', 
-             label="%d minutes (area=%.2f)" % (((lt+1)*5), area))
+             label="%d minutes (area=%.2f)" % (((lt+1)*5), area), zorder=0)
+
+        opt_prob_thr_idx = np.argmax(np.array(POD) - np.array(POFD))
+        #opt_prob_thr_idx = np.argmin((1-np.array(POD))**2 + np.array(POFD)**2)
+        x = POFD[opt_prob_thr_idx]
+        y = POD[opt_prob_thr_idx]
+        scatter([x], [y], c='k', marker='+', s=50, facecolors=None, zorder=1)
+        text(x+0.02, y-0.02, "%.2f" % ROC["prob_thrs"][opt_prob_thr_idx],
+             fontsize=7)
 
     xlim(0, 1)
     ylim(0, 1)
