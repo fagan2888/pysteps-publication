@@ -49,7 +49,6 @@ R_min = 0.1
 num_timesteps = 12
 ensemble_size = 24
 num_workers = 12
-seed = 24
 
 # Output file basename containing the verification statistics
 filename_verif_base = "data/" + data_source[0:3] + "_cascade_results"
@@ -233,7 +232,7 @@ for pei,pe in enumerate(precipevents):
                             kmperpixel=1.0, timestep=5, n_ens_members=ensemble_size, 
                             n_cascade_levels=c, mask_method=m, bandpass_filter_method=bandpass_filter,
                             vel_pert_method="bps", vel_pert_kwargs=vel_pert_kwargs,
-                            num_workers=num_workers, fft_method="numpy", seed=seed)
+                            num_workers=num_workers, fft_method="numpy")
                 
                 # Transform back to rainrates
                 R_fct = transformation.dB_transform(R_fct, metadata, inverse=True)[0]
