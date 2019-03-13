@@ -13,13 +13,15 @@ import pickle
 from pysteps.verification import ensscores, probscores
 
 # Parameters
-filename_verif = "data/cascade_results_accum60.dat"
+filename_verif = "data/mch_cascade_results_accum05.dat"
 
 v_leadtimes = [5,10,15,30,45,60]
 minmaxleadtimes = [5, 60] # min
 
 R_thrs = [0.1, 1.0, 5.0]
 v_scales_km = [1,10,40]
+
+spread_skill_metric = "RMSE_add"
 
 # Plot parameters
 basename_figs = "cascade"
@@ -47,6 +49,9 @@ with open(filename_verif, "rb") as f:
     
     # Only plot available lead times
     v_leadtimes = list(set(v_leadtimes_avail) & set(v_leadtimes))
+    
+    skill_varname = spread_skill_metric + "_skill"
+    spread_varname = spread_skill_metric + "_spread"
     
 for R_thr in R_thrs:
     print("Rainfall threshold:", R_thr)
@@ -171,12 +176,13 @@ for R_thr in R_thrs:
             savefig(figname, bbox_inches="tight")
             print(figname, "saved.")
         
-        ## Only plot skill vs lead time if enough values
+        ## Plot scores vs lead times
+        print("++++ score vs time plots ++++")
         if len(v_leadtimes) > 1:
-            # ROC areas
+            
+            # Get and compute scores
             ROC_areas = dict([(exp, []) for exp in results_keys])
             OPs = dict([(exp, []) for exp in results_keys])
-
             for i,exp in enumerate(results_keys):
                 c = exp[0]
                 m = exp[1]
@@ -190,7 +196,9 @@ for R_thr in R_thrs:
                     rh = ensscores.rankhist_compute(results[c,m]["rankhist"][R_thr][scale_km][lt])
                     OP = (rh[0] + rh[-1]) / sum(rh)
                     OPs[c,m].append(OP) 
-
+            
+            ## Plots
+            # ROC areas
             fig = figure()
             ax = fig.gca()
             for i,exp in enumerate(ROC_areas.keys()):
@@ -234,5 +242,75 @@ for R_thr in R_thrs:
             figname = "figures/%s_OPs_accu%02imin_scale%03ikm_%03.1fmm.%s" % (basename_figs, v_accu, scale_km, R_thr, fmt)
             fig.savefig(figname, bbox_inches="tight")
             print(figname, 'saved.')
+            
+            # Only for lowest threshold
+            if R_thr == R_thrs[0]:
+                CRPSs = dict([(exp, []) for exp in results_keys])
+                skills = dict([(exp, []) for exp in results_keys])
+                spreads = dict([(exp, []) for exp in results_keys])
+                
+                # Get score values
+                for i,exp in enumerate(results_keys):
+                    c = exp[0]
+                    m = exp[1]
+                    m_str = "-" if m == None else "+"
+                    for lt in sorted(results[c,m]["CRPS"][R_thr][scale_km].keys()):
+                        a = probscores.CRPS_compute(results[c,m]["CRPS"][R_thr][scale_km][lt])
+                        CRPSs[exp].append(a)
+                        print(a)
+                    for lt in sorted(results[c,m][skill_varname][R_thr][scale_km].keys()):
+                        a = results[c,m][skill_varname][R_thr][scale_km][lt]["sum"]/results[c,m][skill_varname][R_thr][scale_km][lt]["n"]
+                        skills[exp].append(a)
+                    for lt in sorted(results[c,m][spread_varname][R_thr][scale_km].keys()):
+                        a = results[c,m][spread_varname][R_thr][scale_km][lt]["sum"]/results[c,m][spread_varname][R_thr][scale_km][lt]["n"]
+                        spreads[exp].append(a)
+                
+                # CRPS
+                fig = figure()
+                ax = fig.gca()
+                for i,exp in enumerate(results_keys):
+                    c = exp[0]
+                    m = exp[1]
+                    m_str = "-" if m == None else "+"
+                    ax.plot(v_leadtimes_avail, CRPSs[c,m], ls=linestyles[i], marker=markers[i], 
+                            color=linecolors[i], label="%i levels %s mask" % (c, m_str), lw=2, ms=6)
+                ax.set_xlim(minmaxleadtimes[0], minmaxleadtimes[1])
+                # ax.set_ylim(0.01, 0.675)
+                ax.grid(True)
+                ax.legend(fontsize=12)
+                ax.set_xlabel("Lead time (minutes)", fontsize=12)
+                ax.set_ylabel("CRPS", fontsize=12)
+                title("CRPS", fontsize=ftsize_title)
+                
+                figname = "figures/%s_CRPSs_accu%02imin_scale%03ikm_%03.1fmm.%s" % (basename_figs, v_accu, scale_km, R_thr, fmt)
+                fig.savefig(figname, bbox_inches="tight")
+                print(figname, 'saved.')
+                
+                # Spread-skill
+                fig = figure()
+                ax = fig.gca()
+                for i,exp in enumerate(results_keys):
+                    c = exp[0]
+                    m = exp[1]
+                    m_str = "-" if m == None else "+"
+                    ax.plot(v_leadtimes_avail, skills[c,m], ls="-", marker=markers[i], 
+                            color=linecolors[i], label="%i levels %s mask" % (c, m_str), lw=2, ms=6)
+                    ax.plot(v_leadtimes_avail, spreads[c,m], ls=":", marker=markers[i], 
+                            color=linecolors[i], label="%i levels %s mask" % (c, m_str), lw=2, ms=6)
+                ax.set_xlim(minmaxleadtimes[0], minmaxleadtimes[1])
+                # ax.set_ylim(0.01, 0.675)
+                ax.grid(True)
+                lines = ax.get_lines()
+                legend1 = plt.legend([lines[i] for i in [0,2,4,6]], [lines[i].get_label() for i in [0,2,4,6]], loc="lower right", fontsize=12)
+                legend2 = plt.legend([lines[i] for i in [0,1]], ["RMSE", "Spread"], loc="upper left", fontsize=12)
+                ax.add_artist(legend1)
+                ax.add_artist(legend2)
+                ax.set_xlabel("Lead time (minutes)", fontsize=12)
+                ax.set_ylabel(r"RMSE and spread [mm h$^{-1}$]", fontsize=12)
+                title("Spread-error relationship", fontsize=ftsize_title)
+                
+                figname = "figures/%s_spreads-skills_accu%02imin_scale%03ikm_%03.1fmm.%s" % (basename_figs, v_accu, scale_km, R_thr, fmt)
+                fig.savefig(figname, bbox_inches="tight")
+                print(figname, 'saved.')
         print('---------------')
 print("Finished")
