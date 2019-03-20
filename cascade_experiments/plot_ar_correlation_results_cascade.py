@@ -12,23 +12,24 @@ from pysteps.verification.lifetime import lifetime
 
 # the domain: "fmi" or "mch_hdf5"
 domain          = "mch_hdf5"
-n_levels_verif  = [1,8]
+n_levels        = [1,8]
 recompute_flow  = False
-max_leadtime_min = 5000 # for plotting the ACFs
-rule = '1/e' # Rule to integrate the ACF and get the lifetime [1/e, trapz]
+nhours_ar       = 3      # Max n of hours to plot the ACFs
+rule            = 'trapz'   # Rule to integrate the ACF and get the lifetime [1/e, trapz]
 
-##
-results_cascade = {}
-for n_levels in n_levels_verif:
-    filename = "data/%s_ar2_corr_results_%ilevels_recomputeflow-%s_allcases.dat" % (domain,n_levels,recompute_flow)
-    with open(filename, "rb") as f:
-        results = pickle.load(f)
-    print(filename, "read.")
-    results_cascade[n_levels] = results
-    
-    num_cascade_levels = len(results["cc_obs"]) 
-    leadtimes = results["leadtimes"]
-    leadtimes_plot = leadtimes[0:int(max_leadtime_min/results["timestep"])]
+# Read results file
+filename = "data/%s_ar2_corr_results_recomputeflow-%s.dat" % (domain,recompute_flow)
+with open(filename, "rb") as f:
+    results = pickle.load(f)
+print(filename, "read.")
+results_keys = list(results.keys())[0:2]
+
+for lev in results_keys: 
+    num_cascade_levels = len(results[lev]["cc_obs"]) 
+    leadtimes = results[lev]["leadtimes"]
+    max_leadtime_min = nhours_ar*60
+    max_idx = np.min([int(max_leadtime_min/results[lev]["timestep"]),leadtimes[-1]])
+    leadtimes_plot = leadtimes[0:max_idx]
     
     fig = pyplot.figure(figsize=(5, 3.75))
     ax = fig.gca()
@@ -36,8 +37,8 @@ for n_levels in n_levels_verif:
     colors=iter(cm.Blues_r(np.linspace(0,1,num_cascade_levels+2)))
     for i in range(num_cascade_levels):
         # Derive average ACF for sufficient number of time stamps
-        acf_fct = results["cc_fct"][i] / results["n_fct_samples"][i]
-        acf_obs = results["cc_obs"][i] / results["n_obs_samples"][i]
+        acf_fct = results[lev]["cc_fct"][i] / results[lev]["n_fct_samples"][i]
+        acf_obs = results[lev]["cc_obs"][i] / results[lev]["n_obs_samples"][i]
         
         # Plot
         col = next(colors)
@@ -64,12 +65,11 @@ for n_levels in n_levels_verif:
         tick_spacing = 20
     elif max_leadtime_min < 2000:
         tick_spacing = 60
-    else:
-        tick_spacing = 480
-        
-    xt = np.hstack([[5], np.arange(0, np.max(leadtimes_plot)+5, tick_spacing)])
-    ax.set_xticks(xt)
-    ax.set_xticklabels([int(v) for v in xt])
+    
+    if max_leadtime_min < 2000:    
+        xt = np.hstack([[5], np.arange(0, np.max(leadtimes_plot)+5, tick_spacing)])
+        ax.set_xticks(xt)
+        ax.set_xticklabels([int(v) for v in xt])
     ax.tick_params(labelsize=10)
 
     pyplot.grid(True)
@@ -80,40 +80,47 @@ for n_levels in n_levels_verif:
     pyplot.xlabel("Lead time (minutes)", fontsize=12)
     pyplot.ylabel("Correlation", fontsize=12)
 
-    figname = "figures/%s_ar2_correlations_%ilevels_recomputeflow-%s.pdf" % (domain,n_levels,recompute_flow)
+    figname = "figures/%s_ar2_correlations_%ilevels_recomputeflow-%s.pdf" % (domain,lev,recompute_flow)
     pyplot.savefig(figname, bbox_inches="tight")
     print(figname, 'saved.')
 
 ## Estimate lifetimes from ACF
 lifetime_array = []
-for i in range(num_cascade_levels):
-    # Lifetime of observations
-    acf_obs = results["cc_obs"][i] / results["n_obs_samples"][i]
+   
+# Lifetime fo forecasts
+
+
+# Lifetime of observations
+lifetime_array = np.zeros((num_cascade_levels, 4))
+for i in range(0,num_cascade_levels):
+    acf_obs = results[lev]["cc_obs"][i] / results[lev]["n_obs_samples"][i]
     lf_obs = lifetime(acf_obs, leadtimes, rule=rule)
+    acf_obs_t0 = results[lev]["cc_obs_t0"][i] / results[lev]["n_obs_samples_t0"][i]
+    lf_obs_t0 = lifetime(acf_obs_t0, leadtimes, rule=rule)
     
-    # Lifetime fo forecasts
-    lf_all = [lf_obs]
-    for lev in n_levels_verif:
-        acf_fct = results_cascade[lev]["cc_fct"][i] / results_cascade[lev]["n_fct_samples"][i]
+    lifetime_array[i,0] = lf_obs
+    lifetime_array[i,1] = lf_obs_t0
+    
+    # Lifetime of forecasts
+    for levi,lev in enumerate(results_keys):
+        acf_fct = results[lev]["cc_fct"][i] / results[lev]["n_fct_samples"][i]
         lf_fx = lifetime(acf_fct, leadtimes, rule=rule)
-        lf_all.append(lf_fx)
-    
-    lifetime_array.append(lf_all)
-lifetime_array = np.array(lifetime_array)
+        lifetime_array[i,levi+2] = lf_fx
 
 # Plot log(wavelength) vs log(lifetime), i.e. the dynamic scaling plot
 fig = pyplot.figure(figsize=(5, 3.75))
 ax = fig.gca()
 
-pyplot.loglog(results["central_wavelengths"], lifetime_array[:,0], "k", label="Observations")
+pyplot.loglog(results[results_keys[0]]["central_wavelengths"], lifetime_array[:,0], "k", label="Observations (t=1,...23)")
+pyplot.loglog(results[results_keys[0]]["central_wavelengths"], lifetime_array[:,1], "gray", label="Observations (t=-2,-1,0)")
 
 linestyles = ["k--", "k:", "k-."]
-for idx,lev in enumerate(n_levels_verif):
+for idx,lev in enumerate(n_levels):
     if lev == 1:
         lab_txt = "Forecasts 1-level"
     else:
         lab_txt = "Forecasts %i-levels" % lev
-    pyplot.loglog(results["central_wavelengths"], lifetime_array[:,idx+1], linestyles[idx], label=lab_txt)
+    pyplot.loglog(results[results_keys[0]]["central_wavelengths"], lifetime_array[:,idx+2], linestyles[idx], label=lab_txt)
 
 # Decorate plot
 pyplot.xlabel("Wavelength [km]", fontsize=12)
