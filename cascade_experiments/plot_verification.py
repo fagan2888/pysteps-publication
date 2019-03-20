@@ -13,20 +13,20 @@ import pickle
 from pysteps.verification import ensscores, probscores
 
 # Parameters
-filename_verif = "data/mch_cascade_results_accum05.dat"
+filename_verif = "data/mch_cascade_results_accum05_crps_spread.dat"
 
-v_leadtimes = [5,10,15,30,45,60]
+v_leadtimes = [5, 15, 30, 60]
 minmaxleadtimes = [5, 60] # min
 
 R_thrs = [0.1, 1.0, 5.0]
-v_scales_km = [1,10,40]
+v_scales_km = [1, 10, 40]
 
 spread_skill_metric = "RMSE_add"
 
 # Plot parameters
 basename_figs = "cascade"
 fmt = "pdf"
-ftsize_title = 16
+ftsize_title = 14
 linecolors = ["C3", "C0", "C1", "C2", "C4", "C5", "C6"]
 linestyles = ['-', '-', '-', '-', '-']
 markers = ['o', 'o', 'o', 'o', 'o']
@@ -58,7 +58,7 @@ for R_thr in R_thrs:
     for scale_km in v_scales_km:    
         # ROC curves
         for lt in v_leadtimes:
-            figure()
+            figure(figsize=(5, 3.5))
             plot([0, 1], [0, 1], "k--")
             
             i=0
@@ -78,18 +78,19 @@ for R_thr in R_thrs:
             title("ROC curves +%i min R > %.1f mm/h" % (lt, R_thr), fontsize=ftsize_title)
             title("ROC curves for R > %.1f mm/h" % (R_thr), fontsize=ftsize_title)
             grid(True, ls=':')
-            legend(fontsize=12)
+            legend(fontsize=9)
             
-            figname = "figures/%s_ROC_curves_accu%02imin_scale%03ikm_%dmin_%03.1fmm.%s" % (basename_figs, v_accu, scale_km, lt, R_thr, fmt)
+            figname = "figures/%s_ROC_curves_accu%02imin_scale%03ikm_%02imin_%03.1fmm.%s" % (basename_figs, v_accu, scale_km, lt, R_thr, fmt)
             savefig(figname, bbox_inches="tight")
             print(figname, "saved.")
             
         # Reliability diagrams
         for lt in v_leadtimes:
-            fig = figure()
+            fig = figure(figsize=(5, 3.5))
             ax = fig.gca()
-            iax = inset_axes(ax, width="35%", height="20%", loc=4, borderpad=3.5)
-
+            #iax = inset_axes(ax, width="38%", height="30%", loc=4, borderpad=3.5) # bbox_to_anchor=(0.55, 0.05, 1, 1), bbox_transform=ax.transAxes
+            iax = ax.inset_axes([0.53, 0.12, 0.33, 0.33], transform=ax.transAxes)
+            
             sample_size_min = []
             sample_size_max = []
 
@@ -111,14 +112,14 @@ for R_thr in R_thrs:
                 # Plot sharpness diagram
                 bd = 0.5 * (reldiag["bin_edges"][1] - reldiag["bin_edges"][0])
                 iax.plot(reldiag["bin_edges"][:-1] + bd, reldiag["sample_size"], 
-                         color=linecolors[i], linestyle='-', marker='D', ms=3)
+                         color=linecolors[i], linestyle='-', ms=3)
 
                 sample_size_min.append(int(max(floor(log10(min(reldiag["sample_size"]))), 1)))
                 sample_size_max.append(int(ceil(log10(max(reldiag["sample_size"])))))
 
             iax.set_yscale("log", basey=10)
             iax.set_xticks(reldiag["bin_edges"])
-            iax.set_xticklabels(["%.1f" % max(v, 1e-6) for v in reldiag["bin_edges"]])
+            iax.set_xticklabels(["%.1f" % max(v, 1e-6) for v in reldiag["bin_edges"]], rotation=90)
             yt_min = min(sample_size_min)
             yt_max = max(sample_size_max)
             t = [pow(10.0, k) for k in range(yt_min, yt_max)]
@@ -128,25 +129,30 @@ for R_thr in R_thrs:
             iax.set_ylabel("$\log_{10}$(samples)")
             iax.yaxis.tick_right()
             iax.yaxis.set_label_position("right")
-            iax.tick_params(axis="both", which="major", labelsize=6)
+            iax.tick_params(axis="both", which="major", labelsize=8)
             iax.grid(axis='y', ls=':')
 
             ax.plot([0, 1], [0, 1], "k--")
             ax.set_xlim(0, 1)
             ax.set_ylim(0, 1)
             ax.grid(True, ls=':')
-            ax.legend(fontsize=12)
+            ax.legend(fontsize=9, loc="upper left")
             ax.set_xlabel("Forecast probability")
             ax.set_ylabel("Observed relative frequency")
-            ax.set_title("Reliability for R > %.1f mm/h" % (R_thr), fontsize=ftsize_title)
+            title_str = "Reliability for R > %.1f mm/h" % (R_thr)
+            if R_thr == 0.1 and scale_km == 1 and lt == 60:
+                title_str = "(c) " + title_str
+            if R_thr == 1.0 and scale_km == 1 and lt == 60:
+                title_str = "(d) " + title_str
+            ax.set_title(title_str, fontsize=ftsize_title)
             
-            figname = "figures/%s_reldiags_accu%02imin_scale%03ikm_%dmin_%03.1fmm.%s" % (basename_figs, v_accu, scale_km, lt, R_thr, fmt)
+            figname = "figures/%s_reldiags_accu%02imin_scale%03ikm_%02imin_%03.1fmm.%s" % (basename_figs, v_accu, scale_km, lt, R_thr, fmt)
             savefig(figname, bbox_inches="tight")
             print(figname, "saved.")
             
         # Rank hist
         for lt in v_leadtimes:
-            figure()
+            figure(figsize=(5, 3.5))
 
             r_max = 0.0
             for i,exp in enumerate(results_keys):
@@ -158,21 +164,25 @@ for R_thr in R_thrs:
                 r_max = max(r_max, np.max(r))
                 x = np.linspace(0, 1, rankhist["num_ens_members"] + 1)
                 x += 0.5 * (x[1] - x[0])
-                plot(x, r, color=linecolors[i], linestyle='-', marker='D', 
+                plot(x, r, color=linecolors[i], linestyle='-', 
                      label="%i levels %s mask" % (c, m_str))
                      
             plot(x, np.ones_like(x)*1/x.size, "k--", lw=0.8)
 
             xticks(x[::3] + (x[1] - x[0]), np.arange(1, len(x))[::3])
             xlim(0, 1+1.0/len(x))
-            ylim(0, r_max*1.25)
+            ylim(0, r_max*1.25) 
+            
             xlabel("Rank of observation (among ensemble members)")
             ylabel("Relative frequency")
-            title("Rank histograms", fontsize=ftsize_title)
+            title_str = "Rank histograms"
+            if R_thr == 0.1 and scale_km == 1 and lt == 60:
+                title_str = "(a) " + title_str
+            title(title_str, fontsize=ftsize_title)
             grid(True, axis='y', ls=':')
-            legend(fontsize=12)
+            legend(fontsize=9)
             
-            figname = "figures/%s_rankhists_accu%02imin_scale%03ikm_%dmin_%03.1fmm.%s" % (basename_figs, v_accu, scale_km, lt, R_thr, fmt)
+            figname = "figures/%s_rankhists_accu%02imin_scale%03ikm_%02imin_%03.1fmm.%s" % (basename_figs, v_accu, scale_km, lt, R_thr, fmt)
             savefig(figname, bbox_inches="tight")
             print(figname, "saved.")
         
@@ -199,7 +209,7 @@ for R_thr in R_thrs:
             
             ## Plots
             # ROC areas
-            fig = figure()
+            fig = figure(figsize=(5, 3.5))
             ax = fig.gca()
             for i,exp in enumerate(ROC_areas.keys()):
                 c = exp[0]
@@ -211,9 +221,9 @@ for R_thr in R_thrs:
             ax.set_xlim(minmaxleadtimes[0], minmaxleadtimes[1])
             # ax.set_ylim(0.82, 0.98)
             ax.grid(True)
-            ax.legend(fontsize=12)
-            ax.set_xlabel("Lead time (minutes)", fontsize=12)
-            ax.set_ylabel("ROC area", fontsize=12)
+            ax.legend(fontsize=9)
+            ax.set_xlabel("Lead time [minutes]")
+            ax.set_ylabel("ROC area")
             title("ROC area for R > %.1f mm/h" % (R_thr), fontsize=ftsize_title)
             
             figname = "figures/%s_ROC_areas_accu%02imin_scale%03ikm_%03.1fmm.%s" % (basename_figs, v_accu, scale_km, R_thr, fmt)
@@ -221,7 +231,7 @@ for R_thr in R_thrs:
             print(figname, 'saved.')
 
             # Outlier proportion (OP)
-            fig = figure()
+            fig = figure(figsize=(5, 3.5))
             ax = fig.gca()
             for i,exp in enumerate(results_keys):
                 c = exp[0]
@@ -234,9 +244,9 @@ for R_thr in R_thrs:
             ax.set_xlim(minmaxleadtimes[0], minmaxleadtimes[1])
             # ax.set_ylim(0.01, 0.675)
             ax.grid(True)
-            ax.legend(fontsize=12)
-            ax.set_xlabel("Lead time (minutes)", fontsize=12)
-            ax.set_ylabel("Percentage of outliers", fontsize=12)
+            ax.legend(fontsize=9)
+            ax.set_xlabel("Lead time [minutes]")
+            ax.set_ylabel("Percentage of outliers")
             title("Outlier proportion for R > %.1f mm/h" % (R_thr), fontsize=ftsize_title)
             
             figname = "figures/%s_OPs_accu%02imin_scale%03ikm_%03.1fmm.%s" % (basename_figs, v_accu, scale_km, R_thr, fmt)
@@ -257,7 +267,6 @@ for R_thr in R_thrs:
                     for lt in sorted(results[c,m]["CRPS"][R_thr][scale_km].keys()):
                         a = probscores.CRPS_compute(results[c,m]["CRPS"][R_thr][scale_km][lt])
                         CRPSs[exp].append(a)
-                        print(a)
                     for lt in sorted(results[c,m][skill_varname][R_thr][scale_km].keys()):
                         a = results[c,m][skill_varname][R_thr][scale_km][lt]["sum"]/results[c,m][skill_varname][R_thr][scale_km][lt]["n"]
                         skills[exp].append(a)
@@ -266,7 +275,7 @@ for R_thr in R_thrs:
                         spreads[exp].append(a)
                 
                 # CRPS
-                fig = figure()
+                fig = figure(figsize=(5, 3.5))
                 ax = fig.gca()
                 for i,exp in enumerate(results_keys):
                     c = exp[0]
@@ -277,9 +286,9 @@ for R_thr in R_thrs:
                 ax.set_xlim(minmaxleadtimes[0], minmaxleadtimes[1])
                 # ax.set_ylim(0.01, 0.675)
                 ax.grid(True)
-                ax.legend(fontsize=12)
-                ax.set_xlabel("Lead time (minutes)", fontsize=12)
-                ax.set_ylabel("CRPS", fontsize=12)
+                ax.legend(fontsize=9)
+                ax.set_xlabel("Lead time [minutes]")
+                ax.set_ylabel("CRPS")
                 title("CRPS", fontsize=ftsize_title)
                 
                 figname = "figures/%s_CRPSs_accu%02imin_scale%03ikm_%03.1fmm.%s" % (basename_figs, v_accu, scale_km, R_thr, fmt)
@@ -287,27 +296,30 @@ for R_thr in R_thrs:
                 print(figname, 'saved.')
                 
                 # Spread-skill
-                fig = figure()
+                fig = figure(figsize=(5, 3.5))
                 ax = fig.gca()
                 for i,exp in enumerate(results_keys):
                     c = exp[0]
                     m = exp[1]
                     m_str = "-" if m == None else "+"
-                    ax.plot(v_leadtimes_avail, skills[c,m], ls="-", marker=markers[i], 
+                    ax.plot(v_leadtimes_avail, skills[c,m], ls="-", 
                             color=linecolors[i], label="%i levels %s mask" % (c, m_str), lw=2, ms=6)
-                    ax.plot(v_leadtimes_avail, spreads[c,m], ls=":", marker=markers[i], 
+                    ax.plot(v_leadtimes_avail, spreads[c,m], ls=":", 
                             color=linecolors[i], label="%i levels %s mask" % (c, m_str), lw=2, ms=6)
                 ax.set_xlim(minmaxleadtimes[0], minmaxleadtimes[1])
                 # ax.set_ylim(0.01, 0.675)
                 ax.grid(True)
                 lines = ax.get_lines()
-                legend1 = plt.legend([lines[i] for i in [0,2,4,6]], [lines[i].get_label() for i in [0,2,4,6]], loc="lower right", fontsize=12)
-                legend2 = plt.legend([lines[i] for i in [0,1]], ["RMSE", "Spread"], loc="upper left", fontsize=12)
+                legend1 = plt.legend([lines[i] for i in [0,2,4,6]], [lines[i].get_label() for i in [0,2,4,6]], loc="lower right", fontsize=9)
+                legend2 = plt.legend([lines[i] for i in [0,1]], ["RMSE", "Spread"], loc="upper left", fontsize=9)
                 ax.add_artist(legend1)
                 ax.add_artist(legend2)
-                ax.set_xlabel("Lead time (minutes)", fontsize=12)
-                ax.set_ylabel(r"RMSE and spread [mm h$^{-1}$]", fontsize=12)
-                title("Spread-error relationship", fontsize=ftsize_title)
+                ax.set_xlabel("Lead time [minutes]")
+                ax.set_ylabel(r"RMSE and spread [mm h$^{-1}$]")
+                title_str = "Spread-error relationship"
+                if R_thr == 0.1 and scale_km == 1:
+                    title_str = "(b) " + title_str
+                title(title_str, fontsize=ftsize_title)
                 
                 figname = "figures/%s_spreads-skills_accu%02imin_scale%03ikm_%03.1fmm.%s" % (basename_figs, v_accu, scale_km, R_thr, fmt)
                 fig.savefig(figname, bbox_inches="tight")
