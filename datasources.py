@@ -11,8 +11,12 @@ fmi = {
     "importer": "fmi_pgm",
     "timestep": 5,
     "importer_kwargs": {
-      "gzipped": True
-    } 
+        "gzipped": True
+    },
+    "to_rainrate": {
+        "a": 223,
+        "b": 1.53
+    }
 }
 
 # MeteoSwiss HDF5 files
