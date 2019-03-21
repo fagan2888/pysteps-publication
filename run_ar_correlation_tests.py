@@ -6,7 +6,7 @@ import pickle
 import sys
 import numpy as np
 import datasources, precipevents
-from pysteps import cascade, extrapolation, io, motion
+from pysteps import cascade, extrapolation, io, motion, utils
 from pysteps.timeseries import autoregression
 
 # the domain: "fmi" or "mch"
@@ -21,16 +21,18 @@ timestep = 30
 num_cascade_levels = 8
 # threshold value for precipitation/no precipitation and value for no
 # precipitation
-# TODO: These values are chose assuming that the input data is in dBZ, so
-# without applying conversion this script currently works only for the FMI data.
-R_thr = (10.0, 5.0)
+R_thr = 0.1
 
 if domain == "fmi":
     datasource = datasources.fmi
     precipevents = precipevents.fmi
+    to_rainrate_a = datasource["to_rainrate"]["a"]
+    to_rainrate_b = datasource["to_rainrate"]["b"]
 else:
     datasource = datasources.mch
     precipevents = precipevents.mch
+    to_rainrate_a = None
+    to_rainrate_b = None
 
 root_path = os.path.join(datasources.root_path, datasource["root_path"])
 importer = io.get_method(datasource["importer"], "importer")
@@ -48,8 +50,7 @@ results["n_obs_samples"] = [np.zeros(num_timesteps, dtype=int) \
 
 filter = None
 oflow = motion.get_method(oflow_method)
-extrap_init = extrapolation.get_method("semilagrangian")[0]
-extrapolator = None
+extrapolator = extrapolation.get_method("semilagrangian")
 
 for pei,pe in enumerate(precipevents):
     curdate = datetime.strptime(pe[0], "%Y%m%d%H%M")
@@ -62,15 +63,13 @@ for pei,pe in enumerate(precipevents):
         if curdate + num_timesteps * timedelta(minutes=5) > enddate:
             print("Done.")
             break
-        
+
         fns = io.archive.find_by_date(curdate, root_path, datasource["path_fmt"],
                                       datasource["fn_pattern"], datasource["fn_ext"],
                                       datasource["timestep"], num_prev_files=2)
 
-        R,_,metadata = io.readers.read_timeseries(fns, importer,
-                                                  **datasource["importer_kwargs"])
-
-        # TODO: Convert the data to mm/h.
+        R, _ , metadata = io.readers.read_timeseries(fns, importer,
+                                                     **datasource["importer_kwargs"])
 
         missing_data = False
         for i in range(R.shape[0]):
@@ -79,22 +78,24 @@ for pei,pe in enumerate(precipevents):
                 missing_data = True
                 break
 
-        R[~np.isfinite(R)] = R_thr[1]
-        R[R < R_thr[0]] = R_thr[1]
-        
+        MASK = ~np.isfinite(R[-1, :, :])
+        R, metadata = utils.conversion.to_rainrate(R, metadata, a=to_rainrate_a,
+                                                   b=to_rainrate_b)
+        R, metadata = utils.transformation.dB_transform(R, metadata, threshold=R_thr)
+
+        R_min = np.min(R[np.isfinite(R)])
+        R[~np.isfinite(R)] = R_min
+
         if filter is None:
           filter = cascade.bandpass_filters.filter_gaussian(R.shape[1:], num_cascade_levels)
-
-        if extrapolator is None:
-            extrapolator = extrap_init(shape=R.shape[1:])
 
         # TODO: Supply enough input fields when DARTS is used.
         V = oflow(R[-2:, :, :])
 
-        R_minus_2 = extrapolation.semilagrangian.extrapolate(extrapolator, R[-3, :, :], V, 2,
-                                                             outval=R_thr[1])[-1, :, :]
-        R_minus_1 = extrapolation.semilagrangian.extrapolate(extrapolator, R[-2, :, :], V, 1,
-                                                             outval=R_thr[1])[-1, :, :]
+        R_minus_2 = extrapolator(R[-3, :, :], V, 2, outval=R_min)[-1, :, :]
+        R_minus_2[MASK] = R_min
+        R_minus_1 = extrapolator(R[-2, :, :], V, 1, outval=R_min)[-1, :, :]
+        R_minus_1[MASK] = R_min
 
         c1 = cascade.decomposition.decomposition_fft(R_minus_2, filter)
         c2 = cascade.decomposition.decomposition_fft(R_minus_1, filter)
@@ -128,23 +129,27 @@ for pei,pe in enumerate(precipevents):
                   results["n_ar_samples"][i][t] += 1
                 k += 1
 
-        R_ep = extrapolation.semilagrangian.extrapolate(extrapolator, R[-1, :, :], 
-            V, num_timesteps, outval=R_thr[1])
+        R_ep = extrapolator(R[-1, :, :], V, num_timesteps, outval=R_min)
 
         obs_fns = io.archive.find_by_date(curdate, root_path, datasource["path_fmt"],
                                           datasource["fn_pattern"], datasource["fn_ext"],
                                           datasource["timestep"], num_next_files=num_timesteps)
-        R_obs,_,_ = io.read_timeseries(obs_fns, importer, **datasource["importer_kwargs"])
+        R_obs, _, metadata = io.read_timeseries(obs_fns, importer, **datasource["importer_kwargs"])
         R_obs = R_obs[1:, :, :]
-        MASK_obs = np.isfinite(R_obs[-1, :, :])
-        R_obs[~np.isfinite(R_obs)] = R_thr[1]
-        R_obs[R_obs < R_thr[0]] = R_thr[1]
+
+        R_obs, metadata = utils.conversion.to_rainrate(R_obs, metadata, a=to_rainrate_a,
+                                                       b=to_rainrate_b)
+        R_obs, metadata = utils.transformation.dB_transform(R_obs, metadata,
+                                                            threshold=R_thr)
+        R_min = np.min(R_obs[np.isfinite(R_obs)])
+        R_obs[~np.isfinite(R_obs)] = R_min
 
         for t in range(num_timesteps):
             c_f = cascade.decomposition.decomposition_fft(R_ep[t, :, :], filter)
-            R_ep[t, ~MASK_obs] = R_thr[1]
+            MASK_obs = np.isfinite(R_obs[t, :, :])
+            R_ep[t, ~MASK_obs] = R_min
             c_o = cascade.decomposition.decomposition_fft(R_obs[t, :, :], filter)
-            
+
             for i in range(num_cascade_levels):
                 cc = np.corrcoef(c_f["cascade_levels"][i, :, :].flatten(),
                                  c_o["cascade_levels"][i, :, :].flatten())[0, 1]
