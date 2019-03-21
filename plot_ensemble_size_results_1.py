@@ -124,9 +124,6 @@ for thri, R_thr in enumerate(R_thrs):
     outfn += "_%.1f" % R_thr
     fig.savefig(outfn + ".pdf", bbox_inches="tight")
 
-    #fig = figure(figsize=(5, 3.5))
-    #ax = fig.gca()
-
     for i,es in enumerate(sorted(ROC_areas.keys())):
         leadtimes = (arange(len(ROC_areas[es])) + 1) * 5
         ax_roc.plot(leadtimes, ROC_areas[es], ls=linestyles[i], marker=markers[i],
@@ -141,12 +138,6 @@ for thri, R_thr in enumerate(R_thrs):
     if thri == len(R_thrs) - 1:
         ax_roc.set_xlabel("Lead time (minutes)", fontsize=12)
     ax_roc.set_ylabel("ROC area", fontsize=12)
-
-#    outfn = "ensemble_size_ROC_areas_%s" % domain
-#    if upscale_factor > 1:
-#        outfn += "_%d" % upscale_factor
-#    outfn += "_%.1f" % R_thr
-#    fig.savefig(outfn + ".pdf", bbox_inches="tight")
 
     fig = figure(figsize=(5, 3.5))
     ax = fig.gca()
