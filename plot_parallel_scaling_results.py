@@ -76,7 +76,7 @@ fig.text(0.01, 0.5, "Computation time (minutes)", va="center", ha="center",
 
 ax[1].set_xlabel("Number of threads", fontsize=12)
 
-ax[0].set_title("(a) MeteoSwiss", fontsize=12)
-ax[1].set_title("(b) FMI", fontsize=12)
+ax[0].set_title("a)", loc="left", fontsize=12)
+ax[1].set_title("b)", loc="left", fontsize=12)
 
 pyplot.savefig("ensemble_comp_times.pdf", bbox_inches="tight")
