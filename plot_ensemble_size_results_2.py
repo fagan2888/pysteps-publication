@@ -1,5 +1,5 @@
-# Plots the results produced by run_ensemble_size_tests.py (Figures 9 and 10 in 
-# the paper).
+# Plots the results produced by run_ensemble_size_tests.py (Figures 5-7 in the
+# paper).
 
 from pylab import *
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
@@ -25,40 +25,10 @@ with open(infn + ".dat", "rb") as f:
     results = pickle.load(f)
 
 for R_thr in results[ensemble_size]["ROC"].keys():
-    fig = figure(figsize=(5, 3.5))
+    fig = figure(figsize=(10, 3.5))
 
-    plot([0, 1], [0, 1], "k--")
+    ax = fig.add_subplot(121)
 
-    for i,lt in enumerate(leadtimes[R_thr]):
-        ROC = results[ensemble_size]["ROC"][R_thr][lt]
-        POFD,POD,area = probscores.ROC_curve_compute(ROC, compute_area=True)
-        plot(POFD, POD, color=linecolors[i], lw=2, #linestyle='-', marker='D', 
-             label="%d minutes (area=%.2f)" % (((lt+1)*5), area), zorder=0)
-
-        opt_prob_thr_idx = np.argmax(np.array(POD) - np.array(POFD))
-        #opt_prob_thr_idx = np.argmin((1-np.array(POD))**2 + np.array(POFD)**2)
-        x = POFD[opt_prob_thr_idx]
-        y = POD[opt_prob_thr_idx]
-        scatter([x], [y], c='k', marker='+', s=50, facecolors=None, zorder=1)
-        text(x+0.02, y-0.02, "%.2f" % ROC["prob_thrs"][opt_prob_thr_idx],
-             fontsize=7)
-
-    xlim(0, 1)
-    ylim(0, 1)
-    xlabel("False alarm rate (POFD)", fontsize=12)
-    ylabel("Probability of detection (POD)", fontsize=12)
-    grid(True)
-    legend(fontsize=12, loc=4, framealpha=1.0)
-
-    outfn = "ROC_curves_%s" % domain
-    if upscale_factor > 1:
-        outfn += "_%d" % upscale_factor
-    outfn += "_%.1f" % R_thr
-    fig.savefig(outfn + ".pdf", bbox_inches="tight")
-
-for R_thr in results[ensemble_size]["reldiag"].keys():
-    fig = figure(figsize=(5, 3.5))
-    ax = fig.gca()
     iax = inset_axes(ax, width="35%", height="20%", loc=2, borderpad=2.0)
 
     sample_size_min = []
@@ -83,8 +53,8 @@ for R_thr in results[ensemble_size]["reldiag"].keys():
         sample_size_max.append(int(ceil(log10(max(reldiag["sample_size"])))))
 
     iax.set_yscale("log", basey=10)
-    iax.set_xticks(reldiag["bin_edges"])
-    iax.set_xticklabels(["%.1f" % max(v, 1e-6) for v in reldiag["bin_edges"]])
+    iax.set_xticks(reldiag["bin_edges"][::2])
+    iax.set_xticklabels(["%.1f" % max(v, 1e-6) for v in reldiag["bin_edges"][::2]])
     yt_min = min(sample_size_min)
     yt_max = max(sample_size_max)
     t = [pow(10.0, k) for k in range(yt_min, yt_max)]
@@ -103,10 +73,37 @@ for R_thr in results[ensemble_size]["reldiag"].keys():
     ax.set_ylim(0, 1)
     ax.grid(True)
     ax.legend(fontsize=12, loc=4, framealpha=1.0)
+    ax.set_title("a)", loc="left", fontsize=12)
     ax.set_xlabel("Forecast probability", fontsize=12)
     ax.set_ylabel("Observed relative frequency", fontsize=12)
 
-    outfn = "reldiags_%s" % domain
+    ax = fig.add_subplot(122)
+
+    ax.plot([0, 1], [0, 1], "k--")
+
+    for i,lt in enumerate(leadtimes[R_thr]):
+        ROC = results[ensemble_size]["ROC"][R_thr][lt]
+        POFD,POD,area = probscores.ROC_curve_compute(ROC, compute_area=True)
+        ax.plot(POFD, POD, color=linecolors[i], lw=2, #linestyle='-', marker='D',
+                label="%d minutes (area=%.2f)" % (((lt+1)*5), area))
+
+        opt_prob_thr_idx = np.argmax(np.array(POD) - np.array(POFD))
+        #opt_prob_thr_idx = np.argmin((1-np.array(POD))**2 + np.array(POFD)**2)
+        x = POFD[opt_prob_thr_idx]
+        y = POD[opt_prob_thr_idx]
+        ax.scatter([x], [y], c='k', marker='+', s=50, facecolors=None, zorder=1000)
+        ax.text(x+0.02, y-0.02, "%.2f" % ROC["prob_thrs"][opt_prob_thr_idx],
+                fontsize=7)
+
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.set_title("b)", loc="left", fontsize=12)
+    ax.set_xlabel("False alarm rate (POFD)", fontsize=12)
+    ax.set_ylabel("Probability of detection (POD)", fontsize=12)
+    ax.grid(True)
+    ax.legend(fontsize=12, loc=4, framealpha=1.0)
+
+    outfn = "reldiags_and_ROCs_%s" % domain
     if upscale_factor > 1:
         outfn += "_%d" % upscale_factor
     outfn += "_%.1f" % R_thr
