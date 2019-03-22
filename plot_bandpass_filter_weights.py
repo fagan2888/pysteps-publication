@@ -8,19 +8,24 @@ import numpy as np
 from scipy.interpolate import interp1d
 from pysteps.cascade.bandpass_filters import filter_gaussian
 
-grid_size = 1226
+domain = "fmi"
+
+if domain == "fmi":
+    grid_size = 1226
+else:
+    grid_size = 710
 grid_res = 1.0
 num_levels = 8
 normalize = True
 
-F = filter_gaussian(grid_size, num_levels)
+F = filter_gaussian(grid_size, num_levels, normalize=normalize)
 
 fig = pyplot.figure(figsize=(5, 3.75))
 ax1 = fig.gca()
 ax2 = ax1.twiny()
 
 w = F["weights_1d"]
-cf = F["central_freqs"]
+cf = F["central_wavenumbers"]
 
 for i in range(len(w)):
     x_ip = np.linspace(0, len(w[i])-1, 10000)
@@ -52,4 +57,4 @@ ax2.set_xticks(cf)
 ax2.set_xticklabels(xtl1, fontsize=10)
 ax2.set_xlabel("Spatial scale (kilometers)", fontsize=12)
 
-fig.savefig("bandpass_filter_weights.pdf", bbox_inches="tight")
+fig.savefig("bandpass_filter_weights_%s.pdf" % domain, bbox_inches="tight")
