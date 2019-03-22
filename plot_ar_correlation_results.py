@@ -4,7 +4,7 @@ from matplotlib import pyplot
 import numpy as np
 
 # the domain: "fmi" or "mch"
-domain = "fmi"
+domain = "mch"
 
 with open("ar2_corr_results_%s.dat" % domain, "rb") as f:
     results = pickle.load(f)
@@ -24,14 +24,24 @@ l = pyplot.legend([lines[0], lines[num_cascade_levels+1]], ["AR(2)", "Observed"]
                   fontsize=12, loc=(0.6, 0.9), framealpha=1.0)
 ax.add_artist(l)
 
-ax.text(150, 0.85, '1', fontsize=10)
-ax.text(139, 0.71, '2', fontsize=10)
-ax.text(120, 0.35, '3', fontsize=10)
-ax.text(93, 0.18, '4', fontsize=10)
-ax.text(75, 0.07, '5', fontsize=10)
-ax.text(38, 0.05, '6', fontsize=10)
-ax.text(15, 0.05, '7', fontsize=10)
-ax.text(7, 0.021, '8', fontsize=10)
+if domain == "mch":
+    ax.text(155, 0.84, '1', fontsize=10)
+    ax.text(139, 0.59, '2', fontsize=10)
+    ax.text(120, 0.28, '3', fontsize=10)
+    ax.text(88, 0.17, '4', fontsize=10)
+    ax.text(63, 0.07, '5', fontsize=10)
+    ax.text(38, 0.05, '6', fontsize=10)
+    ax.text(15, 0.05, '7', fontsize=10)
+    ax.text(7, 0.021, '8', fontsize=10)
+else:
+    ax.text(150, 0.85, '1', fontsize=10)
+    ax.text(139, 0.71, '2', fontsize=10)
+    ax.text(120, 0.35, '3', fontsize=10)
+    ax.text(93, 0.18, '4', fontsize=10)
+    ax.text(75, 0.07, '5', fontsize=10)
+    ax.text(38, 0.05, '6', fontsize=10)
+    ax.text(15, 0.05, '7', fontsize=10)
+    ax.text(7, 0.021, '8', fontsize=10)
 
 xt = np.hstack([[5], np.arange(0, np.max(leadtimes)+5, 20)])
 ax.set_xticks(xt)
@@ -46,4 +56,4 @@ pyplot.ylim(-0.02, 1.1)
 pyplot.xlabel("Lead time (minutes)", fontsize=12)
 pyplot.ylabel("Correlation", fontsize=12)
 
-pyplot.savefig("ar2_correlations.pdf", bbox_inches="tight")
+pyplot.savefig("ar2_correlations_%s.pdf" % domain, bbox_inches="tight")
