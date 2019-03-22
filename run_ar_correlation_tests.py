@@ -10,7 +10,7 @@ from pysteps import cascade, extrapolation, io, motion, utils
 from pysteps.timeseries import autoregression
 
 # the domain: "fmi" or "mch"
-domain = "fmi"
+domain = "mch"
 # the optical flow method to use
 oflow_method = "lucaskanade"
 # the number of nowcast timesteps to use in the analysis
@@ -77,6 +77,10 @@ for pei,pe in enumerate(precipevents):
                 print("Skipping, no finite values found for time step %d" % (i+1))
                 missing_data = True
                 break
+
+        if missing_data:
+            curdate += timedelta(minutes=timestep)
+            continue
 
         MASK = ~np.isfinite(R[-1, :, :])
         R, metadata = utils.conversion.to_rainrate(R, metadata, a=to_rainrate_a,
@@ -145,6 +149,13 @@ for pei,pe in enumerate(precipevents):
         R_obs[~np.isfinite(R_obs)] = R_min
 
         for t in range(num_timesteps):
+            if not np.any(np.isfinite(R_obs[t, :, :])):
+                print("Skipping, no finite observation values found for time step %d" % (i+1))
+                continue
+            if not np.any(R_obs[t, :, :] > R_min):
+                print("Skipping, no nonzero observation values found for time step %d" % (i+1))
+                continue
+
             c_f = cascade.decomposition.decomposition_fft(R_ep[t, :, :], filter)
             MASK_obs = np.isfinite(R_obs[t, :, :])
             R_ep[t, ~MASK_obs] = R_min
