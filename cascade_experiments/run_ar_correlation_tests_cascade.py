@@ -228,8 +228,8 @@ for pei,pe in enumerate(precipevents):
                     gamma_2 = autoregression.adjust_lag2_corrcoef2(gamma_1, gamma_2)
                     acf_obs = autoregression.ar_acf([gamma_1, gamma_2],n=nsteps_ar)
                     
-                    results[lev]["cc_obs_t0"][i] += np.array(acf_obs)
-                    results[lev]["n_obs_samples_t0"][i] += 1
+                    results[lev]["cc_obs"][i] += np.array(acf_obs)
+                    results[lev]["n_obs_samples"][i] += 1
             
             ## Derive AR-2 ACF from observed sequence (only start time)
             print("Computing ACF of observations at start time...")
@@ -251,8 +251,8 @@ for pei,pe in enumerate(precipevents):
                 gamma_2 = autoregression.adjust_lag2_corrcoef2(gamma_1, gamma_2)
                 acf_obs = autoregression.ar_acf([gamma_1, gamma_2],n=nsteps_ar)
                 
-                results[lev]["cc_obs"][i] += np.array(acf_obs)
-                results[lev]["n_obs_samples"][i] += 1
+                results[lev]["cc_obs_t0"][i] += np.array(acf_obs)
+                results[lev]["n_obs_samples_t0"][i] += 1
                     
             print("Done.")
 
