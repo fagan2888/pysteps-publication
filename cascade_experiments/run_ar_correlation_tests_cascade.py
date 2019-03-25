@@ -108,20 +108,14 @@ for pei,pe in enumerate(precipevents):
         R, metadata = utils.to_rainrate(R, metadata)
 
         # threshold the data
-        R[R<0.1] = 0.0
+        R[R < 0.1] = 0.0
         metadata["threshold"] = 0.1
 
         # set NaN equal to zero
         R[~np.isfinite(R)] = 0.0
 
-        # copy the original data
-        R_ = R.copy()
-
-        # set NaN equal to zero
-        R_[~np.isfinite(R_)] = 0.0
-
         # transform to dBR
-        R_, metadata_dbr = utils.dB_transform(R_, metadata, zerovalue=zero_value_dbr)
+        R, metadata = utils.dB_transform(R, metadata, zerovalue=zero_value_dbr)
         
         # Read verifying observations
         obs_fns = io.archive.find_by_date(curdate, root_path, datasource["path_fmt"],
@@ -133,36 +127,33 @@ for pei,pe in enumerate(precipevents):
         R_obs, metadata_obs = utils.to_rainrate(R_obs, metadata_obs)
 
         # threshold the data
-        R_obs[R_obs<0.1] = 0.0
+        R_obs[R_obs < 0.1] = 0.0
         metadata_obs["threshold"] = 0.1
 
         # set NaN equal to zero
         R_obs[~np.isfinite(R_obs)] = 0.0
 
-        # set NaN equal to zero
-        R_obs[~np.isfinite(R_obs)] = 0.0
-
         # transform to dBR
-        R_obs, metadata_obs_dbr = utils.dB_transform(R_obs, metadata_obs, zerovalue=zero_value_dbr)
+        R_obs, metadata_obs = utils.dB_transform(R_obs, metadata_obs, zerovalue=zero_value_dbr)
         
         ## Compute motion field
         if oflow_method == "darts":
-            UV = oflow(R_)
+            UV = oflow(R)
         else:
-            UV = oflow(R_[-2:,:,:])
+            UV = oflow(R[-2:,:,:])
         
         for lev in n_levels:
             bandpass_filter = 'uniform' if (lev == 1) else 'gaussian'
             
             ## Compute stochastic nowcast
             print("Computing nowcasting with", lev, "levels...")
-            R_fct = nc(R_[-3:, :, :], UV, n_lead_times, R_thr=metadata_dbr["threshold"], ar_order=ar_order, num_workers=4,
+            R_fct = nc(R[-3:, :, :], UV, n_lead_times, R_thr=metadata["threshold"], ar_order=ar_order, num_workers=4,
                                     kmperpixel=1.0, timestep=datasource["timestep"], n_ens_members=n_members, probmatching_method=pmatching_method, mask_kwargs={'mask_rim':10},
                                     n_cascade_levels=lev, noise_stddev_adj=noise_stddev_adj, mask_method=mask_method, bandpass_filter_method=bandpass_filter,
                                     conditional=conditional_stats, vel_pert_method=None, noise_method=filter, fft_method="numpy", seed=seed)
             # Replace nans and set zeros
-            R_fct[np.isnan(R_fct)] = metadata_dbr["zerovalue"]
-            R_fct[R_fct < metadata_dbr["threshold"]] = metadata_dbr["zerovalue"]
+            R_fct[np.isnan(R_fct)] = metadata["zerovalue"]
+            R_fct[R_fct < metadata["threshold"]] = metadata["zerovalue"]
                
             ## Derive AR-2 ACF from forecast sequences
             print('-------------------------------------')
@@ -182,6 +173,7 @@ for pei,pe in enumerate(precipevents):
                     # Re-compute motion from the three forecast images
                     if recompute_flow:
                         UV = oflow(R_fct[m,lt:lt+2,:,:])
+                    
                     # Put in Lagrangian coordinates the three forecast images
                     R_minus_2 = extrapolation.semilagrangian.extrapolate(R_fct[m,lt, :, :], UV, 2, outval=zero_value_dbr)[-1, :, :]
                     R_minus_1 = extrapolation.semilagrangian.extrapolate(R_fct[m,lt+1, :, :], UV, 1, outval=zero_value_dbr)[-1, :, :]
@@ -210,6 +202,7 @@ for pei,pe in enumerate(precipevents):
                 # Re-compute motion from the three observed images
                 if recompute_flow:
                     UV = oflow(R_obs[lt:lt+2,:,:])
+                
                 # Put in Lagrangian coordinates the three observed images
                 R_minus_2 = extrapolation.semilagrangian.extrapolate(R_obs[lt, :, :], UV, 2, outval=zero_value_dbr)[-1, :, :]
                 R_minus_1 = extrapolation.semilagrangian.extrapolate(R_obs[lt+1, :, :], UV, 1, outval=zero_value_dbr)[-1, :, :]
@@ -233,14 +226,15 @@ for pei,pe in enumerate(precipevents):
             
             ## Derive AR-2 ACF from observed sequence (only start time)
             print("Computing ACF of observations at start time...")
+            
             # Put in Lagrangian coordinates the three observed images
-            R_minus_2 = extrapolation.semilagrangian.extrapolate(R_[-3, :, :], UV, 2, outval=zero_value_dbr)[-1, :, :]
-            R_minus_1 = extrapolation.semilagrangian.extrapolate(R_[-2, :, :], UV, 1, outval=zero_value_dbr)[-1, :, :]
+            R_minus_2 = extrapolation.semilagrangian.extrapolate(R[-3, :, :], UV, 2, outval=zero_value_dbr)[-1, :, :]
+            R_minus_1 = extrapolation.semilagrangian.extrapolate(R[-2, :, :], UV, 1, outval=zero_value_dbr)[-1, :, :]
             
             # Cascade decomposition
             c1 = cascade.decomposition.decomposition_fft(R_minus_2, filter_verif)
             c2 = cascade.decomposition.decomposition_fft(R_minus_1, filter_verif)
-            c3 = cascade.decomposition.decomposition_fft(R_[-1, :, :], filter_verif)
+            c3 = cascade.decomposition.decomposition_fft(R[-1, :, :], filter_verif)
             
             # Compute autocorrelation coefficients
             for i in range(n_levels_verif):
