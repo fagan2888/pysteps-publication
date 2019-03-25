@@ -103,7 +103,10 @@ for pei,pe in enumerate(precipevents):
                 print("Skipping, no finite values found for time step %d" % (i+1))
                 missing_data = True
                 break
-
+        
+        # get radar mask
+        mask = (~np.isnan(R[-1,:,:])).astype(float)
+        
         # convert to mm/h
         R, metadata = utils.to_rainrate(R, metadata)
 
@@ -185,10 +188,10 @@ for pei,pe in enumerate(precipevents):
                     
                     # Compute autocorrelation coefficients and function at each level
                     for i in range(n_levels_verif):
-                        gamma_1 = np.corrcoef(c3["cascade_levels"][i, :, :].flatten(),
-                                              c2["cascade_levels"][i, :, :].flatten())[0, 1]
-                        gamma_2 = np.corrcoef(c3["cascade_levels"][i, :, :].flatten(),
-                                              c1["cascade_levels"][i, :, :].flatten())[0, 1]
+                        gamma_1 = np.corrcoef(c3["cascade_levels"][i, :, :][mask==1].flatten(),
+                                              c2["cascade_levels"][i, :, :][mask==1].flatten())[0, 1]
+                        gamma_2 = np.corrcoef(c3["cascade_levels"][i, :, :][mask==1].flatten(),
+                                              c1["cascade_levels"][i, :, :][mask==1].flatten())[0, 1]
                         gamma_2 = autoregression.adjust_lag2_corrcoef2(gamma_1, gamma_2)
                         acf = autoregression.ar_acf([gamma_1,gamma_2], n=nsteps_ar)
                         
@@ -214,10 +217,10 @@ for pei,pe in enumerate(precipevents):
                 
                 # Compute autocorrelation coefficients
                 for i in range(n_levels_verif):
-                    gamma_1 = np.corrcoef(c3["cascade_levels"][i, :, :].flatten(),
-                                          c2["cascade_levels"][i, :, :].flatten())[0, 1]
-                    gamma_2 = np.corrcoef(c3["cascade_levels"][i, :, :].flatten(),
-                                          c1["cascade_levels"][i, :, :].flatten())[0, 1]
+                    gamma_1 = np.corrcoef(c3["cascade_levels"][i, :, :][mask==1].flatten(),
+                                          c2["cascade_levels"][i, :, :][mask==1].flatten())[0, 1]
+                    gamma_2 = np.corrcoef(c3["cascade_levels"][i, :, :][mask==1].flatten(),
+                                          c1["cascade_levels"][i, :, :][mask==1].flatten())[0, 1]
                     gamma_2 = autoregression.adjust_lag2_corrcoef2(gamma_1, gamma_2)
                     acf_obs = autoregression.ar_acf([gamma_1, gamma_2],n=nsteps_ar)
                     
@@ -238,10 +241,10 @@ for pei,pe in enumerate(precipevents):
             
             # Compute autocorrelation coefficients
             for i in range(n_levels_verif):
-                gamma_1 = np.corrcoef(c3["cascade_levels"][i, :, :].flatten(),
-                                      c2["cascade_levels"][i, :, :].flatten())[0, 1]
-                gamma_2 = np.corrcoef(c3["cascade_levels"][i, :, :].flatten(),
-                                      c1["cascade_levels"][i, :, :].flatten())[0, 1]
+                gamma_1 = np.corrcoef(c3["cascade_levels"][i, :, :][mask==1].flatten(),
+                                      c2["cascade_levels"][i, :, :][mask==1].flatten())[0, 1]
+                gamma_2 = np.corrcoef(c3["cascade_levels"][i, :, :][mask==1].flatten(),
+                                      c1["cascade_levels"][i, :, :][mask==1].flatten())[0, 1]
                 gamma_2 = autoregression.adjust_lag2_corrcoef2(gamma_1, gamma_2)
                 acf_obs = autoregression.ar_acf([gamma_1, gamma_2],n=nsteps_ar)
                 
