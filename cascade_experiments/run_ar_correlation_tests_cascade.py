@@ -12,6 +12,7 @@ import sys
 import numpy as np
 from pysteps import rcparams, cascade, extrapolation, io, motion, utils, nowcasts
 from pysteps.timeseries import autoregression
+from pysteps.utils import remove_rain_norain_discontinuity
 import matplotlib.pyplot as plt
 
 sys.path.insert(0,'..')
@@ -121,6 +122,11 @@ for pei,pe in enumerate(precipevents):
         # transform to dBR
         R, metadata = utils.dB_transform(R, metadata, zerovalue=zero_value_dbr)
         
+        R_ = R.copy()
+            
+        # Remove rain/no-rain discontinuity so that dBR field starts from 0
+        R = remove_rain_norain_discontinuity(R)
+            
         # Read verifying observations
         obs_fns = io.archive.find_by_date(curdate, root_path, datasource["path_fmt"],
                                           datasource["fn_pattern"], datasource["fn_ext"],
@@ -140,25 +146,33 @@ for pei,pe in enumerate(precipevents):
         # transform to dBR
         R_obs, metadata_obs = utils.dB_transform(R_obs, metadata_obs, zerovalue=zero_value_dbr)
         
+        R_obs_ = R_obs.copy()
+        
+        # Remove rain/no-rain discontinuity so that dBR field starts from 0
+        R_obs = remove_rain_norain_discontinuity(R_obs)
+            
         ## Compute motion field
         if oflow_method == "darts":
-            UV = oflow(R)
+            UV = oflow(R_)
         else:
-            UV = oflow(R[-2:,:,:])
+            UV = oflow(R_[-2:,:,:])
         
         for lev in n_levels:
             bandpass_filter = 'uniform' if (lev == 1) else 'gaussian'
             
             ## Compute stochastic nowcast
             print("Computing nowcasting with", lev, "levels...")
-            R_fct = nc(R[-3:, :, :], UV, n_lead_times, R_thr=metadata["threshold"], ar_order=ar_order, num_workers=4,
+            R_fct = nc(R_[-3:, :, :], UV, n_lead_times, R_thr=metadata["threshold"], ar_order=ar_order, num_workers=4,
                                     kmperpixel=1.0, timestep=datasource["timestep"], n_ens_members=n_members, probmatching_method=pmatching_method, mask_kwargs={'mask_rim':10},
                                     n_cascade_levels=lev, noise_stddev_adj=noise_stddev_adj, mask_method=mask_method, bandpass_filter_method=bandpass_filter,
                                     conditional=conditional_stats, vel_pert_method=None, noise_method=filter, fft_method="numpy", seed=seed)
             # Replace nans and set zeros
             R_fct[np.isnan(R_fct)] = metadata["zerovalue"]
             R_fct[R_fct < metadata["threshold"]] = metadata["zerovalue"]
-               
+            
+            # Remove rain/no-rain discontinuity so that dBR field starts from 0
+            R_fct = remove_rain_norain_discontinuity(R_fct)
+            
             ## Derive AR-2 ACF from forecast sequences
             print('-------------------------------------')
             print("Computing ACF of nowcasts...")
@@ -210,7 +224,7 @@ for pei,pe in enumerate(precipevents):
                 print('Lead time:', lt)
                 # Re-compute motion from the three observed images
                 if recompute_flow:
-                    UV = oflow(R_obs[lt:lt+2,:,:])
+                    UV = oflow(R_obs_[lt:lt+2,:,:])
                 
                 # Put in Lagrangian coordinates the three observed images
                 R_minus_2 = extrapolation.semilagrangian.extrapolate(R_obs[lt, :, :], UV, 2, outval=zero_value_dbr)[-1, :, :]
