@@ -27,6 +27,7 @@ n_levels_verif  = 8       # to verify the nowcast [keep it fixed]
 recompute_flow  = False   # whether to recompute the flow of the fct/obs fields (very slow)
 
 nhours_ar       = 2000    # max number of hours to integrate the full ACF
+min_rho_level0  = 0.95    # minimum auto-correlation of level 0 to consider as valid
 
 # Forecast parameters
 n_lead_times        = 12
@@ -192,6 +193,11 @@ for pei,pe in enumerate(precipevents):
                                               c2["cascade_levels"][i, :, :][mask==1].flatten())[0, 1]
                         gamma_2 = np.corrcoef(c3["cascade_levels"][i, :, :][mask==1].flatten(),
                                               c1["cascade_levels"][i, :, :][mask==1].flatten())[0, 1]
+                        
+                        if i == 0 and gamma_1 < min_rho_level0:
+                            print("Too low correlation at level 0, gamma_1 =", gamma_1)
+                            break
+                            
                         gamma_2 = autoregression.adjust_lag2_corrcoef2(gamma_1, gamma_2)
                         acf = autoregression.ar_acf([gamma_1,gamma_2], n=nsteps_ar)
                         
@@ -221,6 +227,11 @@ for pei,pe in enumerate(precipevents):
                                           c2["cascade_levels"][i, :, :][mask==1].flatten())[0, 1]
                     gamma_2 = np.corrcoef(c3["cascade_levels"][i, :, :][mask==1].flatten(),
                                           c1["cascade_levels"][i, :, :][mask==1].flatten())[0, 1]
+                    
+                    if i == 0 and gamma_1 < min_rho_level0:
+                        print("Too low correlation at level 0, gamma_1 =", gamma_1)
+                        break
+                            
                     gamma_2 = autoregression.adjust_lag2_corrcoef2(gamma_1, gamma_2)
                     acf_obs = autoregression.ar_acf([gamma_1, gamma_2],n=nsteps_ar)
                     
@@ -245,6 +256,11 @@ for pei,pe in enumerate(precipevents):
                                       c2["cascade_levels"][i, :, :][mask==1].flatten())[0, 1]
                 gamma_2 = np.corrcoef(c3["cascade_levels"][i, :, :][mask==1].flatten(),
                                       c1["cascade_levels"][i, :, :][mask==1].flatten())[0, 1]
+                
+                if i == 0 and gamma_1 < min_rho_level0:
+                    print("Too low correlation at level 0, gamma_1 =", gamma_1)
+                    break
+                
                 gamma_2 = autoregression.adjust_lag2_corrcoef2(gamma_1, gamma_2)
                 acf_obs = autoregression.ar_acf([gamma_1, gamma_2],n=nsteps_ar)
                 
