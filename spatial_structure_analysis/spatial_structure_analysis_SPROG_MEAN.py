@@ -19,7 +19,7 @@ nc = stp.nowcasts.steps.forecast
 sys.path.insert(0,'..')
 import precipevents
 
-data_source = "fmi"
+data_source = "mch_hdf5"
 if data_source == "fmi":
     # all events
     precipevents = precipevents.fmi
@@ -32,13 +32,13 @@ if data_source == "mch_hdf5":
     precipevents = [("201701311000", "201701311000")]
 
 # Experiment parameters (do not change order!) ['STOCH','MEAN','SPROG']
-nowcast_types       = ['STOCH','MEAN','SPROG']
+nowcast_types       = ['STOCH']
 
 # Forecast parameters
 timestep_run        = 240
-num_prev_files      = 2
-n_lead_times        = 24
-n_members           = 48
+num_prev_files      = 5
+n_lead_times        = 6
+n_members           = 2
 
 n_levels            = 8
 ar_order            = 2
@@ -56,7 +56,7 @@ extrap_method       = "semilagrangian"
 bandpass_filter = 'uniform' if (n_levels == 1) else 'gaussian'
 
 # Figure parameters
-animate             = False
+animate             = True
 nloops              = 2
 plot_leadtimes      = [0,2,5,11,23]
 
@@ -159,12 +159,13 @@ for pei,pe in enumerate(precipevents):
 
                 stp.plt.animate(R, nloops=nloops, timestamps=metadata["timestamps"],
                 R_fct=R_fct_, timestep_min=datasource["timestep"], UV=UV,
-                motion_plot=stp.rcparams.plot.motion_plot,
-                geodata=metadata,
+                motion_plot=stp.rcparams.plot.motion_plot, step=60,
+                geodata=metadata, map="cartopy", fig_dpi=150,
                 colorscale=stp.rcparams.plot.colorscale,
-                plotanimation=True, savefig=False,
-                path_outputs=stp.rcparams.outputs.path_outputs)
-
+                type="ensemble", prob_thr=1.0,
+                plotanimation=True, savefig=True,
+                path_outputs="figures", axis="off")
+                
             # Replace nans and set zeros
             R_fct[np.isnan(R_fct)] = metadata_dbr["zerovalue"]
             R_fct[R_fct < metadata_dbr["threshold"]] = metadata_dbr["zerovalue"]
@@ -206,13 +207,24 @@ for pei,pe in enumerate(precipevents):
 
             # Decorate plot
             plt.legend(loc="lower left")
-
+            if n_levels == 1:
+                str_levels = ' - %i level' % n_levels
+            else:
+                str_levels = ' - %i levels' % n_levels
+            # Title
             if nowcast == "STOCH":
-                ax.set_title('Ensemble members', fontsize=18)
+                ax.set_title('(a) Ensemble members', fontsize=18)
             if nowcast == "MEAN":
-                ax.set_title('Ensemble mean', fontsize=18)
+                if data_source[0:3] == "fmi":
+                    ax.set_title('(b) Ensemble mean', fontsize=18)
+                else:
+                    if n_levels == 8:
+                        ax.set_title('(a) Ensemble mean', fontsize=18)
+                    if n_levels == 1:
+                        ax.set_title('(b) Ensemble mean', fontsize=18)
             if nowcast == "SPROG":
-                ax.set_title('S-PROG', fontsize=18)
+                ax.set_title('(c) S-PROG', fontsize=18)
+            
             ax.set_ylim([-30,60])
             plt.setp(ax.get_xticklabels(), fontsize=14)
             plt.setp(ax.get_yticklabels(), fontsize=14)
