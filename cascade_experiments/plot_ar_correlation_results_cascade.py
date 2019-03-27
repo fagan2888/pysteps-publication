@@ -9,6 +9,7 @@ from matplotlib import pyplot
 from matplotlib.pyplot import cm
 import numpy as np
 from pysteps.verification.lifetime import lifetime
+from pysteps.timeseries import autoregression
 
 # the domain: "fmi" or "mch_hdf5"
 domain          = "mch_hdf5"
@@ -16,6 +17,7 @@ n_levels        = [1,8]
 recompute_flow  = False
 nhours_ar       = 3      # Max n of hours to plot the ACFs
 rule            = 'trapz'   # Rule to integrate the ACF and get the lifetime [1/e, trapz]
+recompute_acf   = False  # Whether to recompute the ACF starting from the first two rhos
 
 # Read results file
 filename = "data/%s_ar2_corr_results_recomputeflow-%s.dat" % (domain,recompute_flow)
@@ -86,16 +88,19 @@ for lev in results_keys:
 
 ## Estimate lifetimes from ACF
 lifetime_array = []
-   
-# Lifetime fo forecasts
-
 
 # Lifetime of observations
 lifetime_array = np.zeros((num_cascade_levels, 4))
 for i in range(0,num_cascade_levels):
     acf_obs = results[lev]["cc_obs"][i] / results[lev]["n_obs_samples"][i]
+    
+    if recompute_acf:
+        acf_obs = autoregression.ar_acf(acf_obs[0:2].tolist(), n=len(acf_obs))
     lf_obs = lifetime(acf_obs, leadtimes, rule=rule)
+    
     acf_obs_t0 = results[lev]["cc_obs_t0"][i] / results[lev]["n_obs_samples_t0"][i]
+    if recompute_acf:
+        acf_obs_t0 = autoregression.ar_acf(acf_obs_t0[0:2].tolist(), n=len(acf_obs_t0))
     lf_obs_t0 = lifetime(acf_obs_t0, leadtimes, rule=rule)
     
     lifetime_array[i,0] = lf_obs
@@ -104,6 +109,8 @@ for i in range(0,num_cascade_levels):
     # Lifetime of forecasts
     for levi,lev in enumerate(results_keys):
         acf_fct = results[lev]["cc_fct"][i] / results[lev]["n_fct_samples"][i]
+        if recompute_acf:
+            acf_fct = autoregression.ar_acf(acf_fct[0:2].tolist(), n=len(acf_fct))
         lf_fx = lifetime(acf_fct, leadtimes, rule=rule)
         lifetime_array[i,levi+2] = lf_fx
 
@@ -111,8 +118,10 @@ for i in range(0,num_cascade_levels):
 fig = pyplot.figure(figsize=(5, 3.75))
 ax = fig.gca()
 
-pyplot.loglog(results[results_keys[0]]["central_wavelengths"], lifetime_array[:,0], "k", label="Observations (t=1,...23)")
-pyplot.loglog(results[results_keys[0]]["central_wavelengths"], lifetime_array[:,1], "gray", label="Observations (t=-2,-1,0)")
+pyplot.loglog(results[results_keys[0]]["central_wavelengths"], lifetime_array[:,0], "k", marker='o', label="Observations")
+#pyplot.loglog(results[results_keys[0]]["central_wavelengths"], lifetime_array[:,1], "gray", label="Observations (t=-2,-1,0)")
+pyplot.ylim([1e-1,10**4.5])
+pyplot.xlim([2,710])
 
 linestyles = ["k--", "k:", "k-."]
 for idx,lev in enumerate(n_levels):
@@ -120,7 +129,7 @@ for idx,lev in enumerate(n_levels):
         lab_txt = "Forecasts 1-level"
     else:
         lab_txt = "Forecasts %i-levels" % lev
-    pyplot.loglog(results[results_keys[0]]["central_wavelengths"], lifetime_array[:,idx+2], linestyles[idx], label=lab_txt)
+    pyplot.loglog(results[results_keys[0]]["central_wavelengths"], lifetime_array[:,idx+2], linestyles[idx], marker='o',label=lab_txt)
 
 # Decorate plot
 pyplot.xlabel("Wavelength [km]", fontsize=12)
@@ -129,6 +138,6 @@ pyplot.legend(loc="lower right")
 pyplot.grid()
 
 rule_txt = "e" if rule == "1/e" else rule
-figname = "figures/%s_ar2_wavelength-vs-lifetime_rule-%s_recomputeflow-%s.pdf" % (domain,rule_txt,recompute_flow)
+figname = "figures/%s_ar2_wavelength-vs-lifetime_rule-%s_recomputeflow-%s_recomputeacf-%s.pdf" % (domain,rule_txt,recompute_flow,recompute_acf)
 pyplot.savefig(figname, bbox_inches="tight")
 print(figname, 'saved.')
