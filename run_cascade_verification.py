@@ -36,19 +36,19 @@ if data_source[0:3] == "mch":
     # all events
     precipevents = precipevents.mch
     # only 1 event (comment out if you want all events)
-    precipevents = [("201701311000", "201701311800")]
+    # precipevents = [("201701311000", "201701311800")]
 
 # Cascade experiments
 cascade_levels = [1,8]
 mask_methods = ['incremental', None]
 
 # Forecast parameters
-timestep = 240
+timestep = 120
 R_min = 0.1
 
 num_timesteps = 12
 ensemble_size = 24
-num_workers = 12
+num_workers = 6
 
 # Output file basename containing the verification statistics
 filename_verif_base = "data/" + data_source[0:3] + "_cascade_results"
