@@ -11,7 +11,8 @@ import pickle
 import sys
 import numpy as np
 from pysteps import rcparams, cascade, extrapolation, io, motion, utils, nowcasts
-from pysteps.timeseries import autoregression
+from pysteps.nowcasts import utils as nowcast_utils
+from pysteps.timeseries import autoregression, correlation
 from pysteps.utils import remove_rain_norain_discontinuity
 import matplotlib.pyplot as plt
 
@@ -24,9 +25,11 @@ timestep = 240
 
 # Experiment parameters
 n_levels            = [1,8]   # to produce the nowcast [1 or 8]
-n_levels_verif      = 8       # to verify the nowcast [keep it fixed]
+n_levels_verif      = 6       # to verify the nowcast (keep it fixed)
 recompute_flow      = False   # whether to recompute the flow of the fct/obs fields (very slow)
-remove_norain_step  = True    # whether to remove the rain/norain steps
+remove_norain_step  = False   # whether to remove the rain/norain step
+MASK_thr            = None    # whether to mask to cascade statistics [None, "yes"]
+
 nhours_ar           = 2000    # max number of hours to integrate the full ACF
 min_rho_level0      = 0.95    # minimum auto-correlation of level 0 to consider as valid
 
@@ -51,7 +54,7 @@ if domain == "fmi":
 if domain[0:3] == "mch":
     precipevents = precipevents.mch
     # only 1 event (comment out if you want all events)
-    precipevents = [("201701311000", "201701311400")]
+    # precipevents = [("201701311000", "201701311400")]
 
 datasource = rcparams.data_sources[domain]
 root_path = datasource["root_path"]
@@ -61,7 +64,7 @@ oflow = motion.get_method(oflow_method)
 extrapolator = extrapolation.get_method("semilagrangian")
 nc = nowcasts.steps.forecast
 
-filter_verif = None   
+filter_verif = None
 
 # Dictionary containing the sum of temporal autocorrelation functions
 results = {}
@@ -98,16 +101,12 @@ for pei,pe in enumerate(precipevents):
 
         R,_,metadata = io.readers.read_timeseries(fns, importer,
                                                   **datasource["importer_kwargs"])
-
         missing_data = False
         for i in range(R.shape[0]):
             if not np.any(np.isfinite(R[i, :, :])):
                 print("Skipping, no finite values found for time step %d" % (i+1))
                 missing_data = True
                 break
-        
-        # get radar mask
-        mask = (~np.isnan(R[-1,:,:]))
             
         # convert to mm/h
         R, metadata = utils.to_rainrate(R, metadata)
@@ -157,7 +156,7 @@ for pei,pe in enumerate(precipevents):
         if oflow_method == "darts":
             UV = oflow(R_)
         else:
-            UV = oflow(R_[-2:,:,:])
+            UV = oflow(R_[-3:,:,:])
         
         for lev in n_levels:
             bandpass_filter = 'uniform' if (lev == 1) else 'gaussian'
@@ -201,35 +200,49 @@ for pei,pe in enumerate(precipevents):
                     # Put in Lagrangian coordinates the three forecast images
                     R_minus_2 = extrapolation.semilagrangian.extrapolate(R_fct[m,lt, :, :], UV, 2, outval=outval_extr)[-1, :, :]
                     R_minus_1 = extrapolation.semilagrangian.extrapolate(R_fct[m,lt+1, :, :], UV, 1, outval=outval_extr)[-1, :, :]
+                    R_minus_0 = R_fct[m,lt+2, :, :]
+                    
+                    # Compute mask
+                    if MASK_thr is not None:
+                        MASK_thr_2 = (R_minus_2 >= 0.1)
+                        MASK_thr_1 = (R_minus_1 >= 0.1)
+                        MASK_thr_0 = (R_minus_0 >= 0.1)
+                        
+                        MASK_thr = [MASK_thr_2, MASK_thr_1, MASK_thr_0]
+                        MASK_thr = np.logical_and.reduce(MASK_thr)
                     
                     # Cascade decomposition
-                    c1 = cascade.decomposition.decomposition_fft(R_minus_2, filter_verif)
-                    c2 = cascade.decomposition.decomposition_fft(R_minus_1, filter_verif)
-                    c3 = cascade.decomposition.decomposition_fft(R_fct[m,lt+2, :, :], filter_verif)
+                    c_2 = cascade.decomposition.decomposition_fft(R_minus_2, filter_verif, MASK=MASK_thr)
+                    c_1 = cascade.decomposition.decomposition_fft(R_minus_1, filter_verif, MASK=MASK_thr)
+                    c_0 = cascade.decomposition.decomposition_fft(R_minus_0, filter_verif, MASK=MASK_thr)
+                    R_d = [c_2,c_1,c_0]
+                    R_c, mu, sigma = nowcast_utils.stack_cascades(R_d, n_levels_verif)
                     
-                    # Compute autocorrelation coefficients and function at each level
+                    # compute lag-l temporal autocorrelation coefficients for each cascade level
+                    GAMMA = np.empty((n_levels_verif, ar_order))
                     for i in range(n_levels_verif):
-                        # normalize cascade levels
-                        c1["cascade_levels"][i, :, :] = (c1["cascade_levels"][i, :, :] - c1["means"][i])/c1["stds"][i]
-                        c2["cascade_levels"][i, :, :] = (c2["cascade_levels"][i, :, :] - c2["means"][i])/c2["stds"][i]
-                        c3["cascade_levels"][i, :, :] = (c3["cascade_levels"][i, :, :] - c3["means"][i])/c3["stds"][i]
-                        
-                        gamma_1 = np.corrcoef(c3["cascade_levels"][i, :, :][mask==1].flatten(),
-                                              c2["cascade_levels"][i, :, :][mask==1].flatten())[0, 1]
-                        gamma_2 = np.corrcoef(c3["cascade_levels"][i, :, :][mask==1].flatten(),
-                                              c1["cascade_levels"][i, :, :][mask==1].flatten())[0, 1]
-                        
+                        R_c_ = np.stack([R_c[i, j, :, :] for j in range(ar_order + 1)])
+                        GAMMA[i, :] = correlation.temporal_autocorrelation(R_c_, MASK=MASK_thr)
+                    R_c_ = None
+                    
+                    if ar_order == 2:
+                        # adjust the lag-2 correlation coefficient to ensure that the AR(p)
+                        # process is stationary
+                        for i in range(n_levels_verif):
+                            GAMMA[i, 1] = autoregression.adjust_lag2_corrcoef2(GAMMA[i, 0], GAMMA[i, 1])
+                    nowcast_utils.print_corrcoefs(GAMMA)
+                    
+                    # Compute full ACF
+                    is_rho_valid = True
+                    for i in range(n_levels_verif):
+                        gamma_1 = GAMMA[i,0]
+                        gamma_2 = GAMMA[i,1]
+                        acf = autoregression.ar_acf([gamma_1,gamma_2], n=nsteps_ar)
                         if i == 0 and gamma_1 < min_rho_level0:
                             print("Too low correlation at level 0, gamma_1 =", gamma_1)
                             break
-                            
-                        gamma_2 = autoregression.adjust_lag2_corrcoef2(gamma_1, gamma_2)
-                        acf = autoregression.ar_acf([gamma_1,gamma_2], n=nsteps_ar)
-                        
                         results[lev]["cc_fct"][i] += np.array(acf)
                         results[lev]["n_fct_samples"][i] += 1
-                        
-                        print("Level", i, "|", gamma_1, gamma_2)
             
             ## Derive AR-2 ACF from observed sequences (for each lead time)
             print("Computing ACF of observations at each lead time...")        
@@ -242,35 +255,48 @@ for pei,pe in enumerate(precipevents):
                 # Put in Lagrangian coordinates the three observed images
                 R_minus_2 = extrapolation.semilagrangian.extrapolate(R_obs[lt, :, :], UV, 2, outval=outval_extr)[-1, :, :]
                 R_minus_1 = extrapolation.semilagrangian.extrapolate(R_obs[lt+1, :, :], UV, 1, outval=outval_extr)[-1, :, :]
+                R_minus_0 = R_obs[lt+2, :, :]
+                
+                # Compute mask
+                if MASK_thr is not None:
+                    MASK_thr_2 = (R_minus_2 >= 0.1)
+                    MASK_thr_1 = (R_minus_1 >= 0.1)
+                    MASK_thr_0 = (R_minus_0 >= 0.1)
+                    
+                    MASK_thr = [MASK_thr_2, MASK_thr_1, MASK_thr_0]
+                    MASK_thr = np.logical_and.reduce(MASK_thr)
                 
                 # Cascade decomposition
-                c1 = cascade.decomposition.decomposition_fft(R_minus_2, filter_verif)
-                c2 = cascade.decomposition.decomposition_fft(R_minus_1, filter_verif)
-                c3 = cascade.decomposition.decomposition_fft(R_obs[lt+2, :, :], filter_verif)
+                c_2 = cascade.decomposition.decomposition_fft(R_minus_2, filter_verif, MASK=MASK_thr)
+                c_1 = cascade.decomposition.decomposition_fft(R_minus_1, filter_verif, MASK=MASK_thr)
+                c_0 = cascade.decomposition.decomposition_fft(R_minus_0, filter_verif, MASK=MASK_thr)
+                R_d = [c_2,c_1,c_0]
+                R_c, mu, sigma = nowcast_utils.stack_cascades(R_d, n_levels_verif)
                 
-                # Compute autocorrelation coefficients
+                # compute lag-l temporal autocorrelation coefficients for each cascade level
+                GAMMA = np.empty((n_levels_verif, ar_order))
                 for i in range(n_levels_verif):
-                    # normalize cascade levels
-                    c1["cascade_levels"][i, :, :] = (c1["cascade_levels"][i, :, :] - c1["means"][i])/c1["stds"][i]
-                    c2["cascade_levels"][i, :, :] = (c2["cascade_levels"][i, :, :] - c2["means"][i])/c2["stds"][i]
-                    c3["cascade_levels"][i, :, :] = (c3["cascade_levels"][i, :, :] - c3["means"][i])/c3["stds"][i]
-                    
-                    gamma_1 = np.corrcoef(c3["cascade_levels"][i, :, :][mask==1].flatten(),
-                                          c2["cascade_levels"][i, :, :][mask==1].flatten())[0, 1]
-                    gamma_2 = np.corrcoef(c3["cascade_levels"][i, :, :][mask==1].flatten(),
-                                          c1["cascade_levels"][i, :, :][mask==1].flatten())[0, 1]
-                    
+                    R_c_ = np.stack([R_c[i, j, :, :] for j in range(ar_order + 1)])
+                    GAMMA[i, :] = correlation.temporal_autocorrelation(R_c_, MASK=MASK_thr)
+                R_c_ = None
+                
+                if ar_order == 2:
+                    # adjust the lag-2 correlation coefficient to ensure that the AR(p)
+                    # process is stationary
+                    for i in range(n_levels_verif):
+                        GAMMA[i, 1] = autoregression.adjust_lag2_corrcoef2(GAMMA[i, 0], GAMMA[i, 1])
+                nowcast_utils.print_corrcoefs(GAMMA)
+                
+                # Compute full ACF
+                for i in range(n_levels_verif):
+                    gamma_1 = GAMMA[i,0]
+                    gamma_2 = GAMMA[i,1]
+                    acf = autoregression.ar_acf([gamma_1,gamma_2], n=nsteps_ar)
                     if i == 0 and gamma_1 < min_rho_level0:
                         print("Too low correlation at level 0, gamma_1 =", gamma_1)
                         break
-                            
-                    gamma_2 = autoregression.adjust_lag2_corrcoef2(gamma_1, gamma_2)
-                    acf_obs = autoregression.ar_acf([gamma_1, gamma_2],n=nsteps_ar)
-                    
-                    results[lev]["cc_obs"][i] += np.array(acf_obs)
+                    results[lev]["cc_obs"][i] += np.array(acf)
                     results[lev]["n_obs_samples"][i] += 1
-                    
-                    print("Level", i, "|", gamma_1, gamma_2)
             
             ## Derive AR-2 ACF from observed sequence (only start time)
             print("Computing ACF of observations at start time...")
@@ -278,35 +304,48 @@ for pei,pe in enumerate(precipevents):
             # Put in Lagrangian coordinates the three observed images
             R_minus_2 = extrapolation.semilagrangian.extrapolate(R[-3, :, :], UV, 2, outval=outval_extr)[-1, :, :]
             R_minus_1 = extrapolation.semilagrangian.extrapolate(R[-2, :, :], UV, 1, outval=outval_extr)[-1, :, :]
+            R_minus_0 = R[-1, :, :]
+            
+            # Compute mask
+            if MASK_thr is not None:
+                MASK_thr_2 = (R_minus_2 >= 0.1)
+                MASK_thr_1 = (R_minus_1 >= 0.1)
+                MASK_thr_0 = (R_minus_0 >= 0.1)
+                
+                MASK_thr = [MASK_thr_2, MASK_thr_1, MASK_thr_0]
+                MASK_thr = np.logical_and.reduce(MASK_thr)
             
             # Cascade decomposition
-            c1 = cascade.decomposition.decomposition_fft(R_minus_2, filter_verif)
-            c2 = cascade.decomposition.decomposition_fft(R_minus_1, filter_verif)
-            c3 = cascade.decomposition.decomposition_fft(R[-1, :, :], filter_verif)
+            c_2 = cascade.decomposition.decomposition_fft(R_minus_2, filter_verif, MASK=MASK_thr)
+            c_1 = cascade.decomposition.decomposition_fft(R_minus_1, filter_verif, MASK=MASK_thr)
+            c_0 = cascade.decomposition.decomposition_fft(R_minus_0, filter_verif, MASK=MASK_thr)
+            R_d = [c_2,c_1,c_0]
+            R_c, mu, sigma = nowcast_utils.stack_cascades(R_d, n_levels_verif)
             
-            # Compute autocorrelation coefficients
+            # compute lag-l temporal autocorrelation coefficients for each cascade level
+            GAMMA = np.empty((n_levels_verif, ar_order))
             for i in range(n_levels_verif):
-                # normalize cascade levels
-                c1["cascade_levels"][i, :, :] = (c1["cascade_levels"][i, :, :] - c1["means"][i])/c1["stds"][i]
-                c2["cascade_levels"][i, :, :] = (c2["cascade_levels"][i, :, :] - c2["means"][i])/c2["stds"][i]
-                c3["cascade_levels"][i, :, :] = (c3["cascade_levels"][i, :, :] - c3["means"][i])/c3["stds"][i]
-                
-                gamma_1 = np.corrcoef(c3["cascade_levels"][i, :, :][mask==1].flatten(),
-                                      c2["cascade_levels"][i, :, :][mask==1].flatten())[0, 1]
-                gamma_2 = np.corrcoef(c3["cascade_levels"][i, :, :][mask==1].flatten(),
-                                      c1["cascade_levels"][i, :, :][mask==1].flatten())[0, 1]
-                
+                R_c_ = np.stack([R_c[i, j, :, :] for j in range(ar_order + 1)])
+                GAMMA[i, :] = correlation.temporal_autocorrelation(R_c_, MASK=MASK_thr)
+            R_c_ = None
+            
+            if ar_order == 2:
+                # adjust the lag-2 correlation coefficient to ensure that the AR(p)
+                # process is stationary
+                for i in range(n_levels_verif):
+                    GAMMA[i, 1] = autoregression.adjust_lag2_corrcoef2(GAMMA[i, 0], GAMMA[i, 1])
+            nowcast_utils.print_corrcoefs(GAMMA)
+            
+            # Compute full ACF
+            for i in range(n_levels_verif):
+                gamma_1 = GAMMA[i,0]
+                gamma_2 = GAMMA[i,1]
+                acf = autoregression.ar_acf([gamma_1,gamma_2], n=nsteps_ar)
                 if i == 0 and gamma_1 < min_rho_level0:
                     print("Too low correlation at level 0, gamma_1 =", gamma_1)
                     break
-                
-                gamma_2 = autoregression.adjust_lag2_corrcoef2(gamma_1, gamma_2)
-                acf_obs = autoregression.ar_acf([gamma_1, gamma_2],n=nsteps_ar)
-                
-                results[lev]["cc_obs_t0"][i] += np.array(acf_obs)
+                results[lev]["cc_obs_t0"][i] += np.array(acf)
                 results[lev]["n_obs_samples_t0"][i] += 1
-                
-                print("Level", i, "|", gamma_1, gamma_2)
                     
             print("Done.")
 
