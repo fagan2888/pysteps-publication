@@ -32,12 +32,12 @@ if data_source == "mch_hdf5":
     precipevents = [("201701311000", "201701311000")]
 
 # Experiment parameters (do not change order!) ['STOCH','MEAN','SPROG']
-nowcast_types       = ['STOCH']
+nowcast_types       = ['STOCH','MEAN','SPROG']
 
 # Forecast parameters
 timestep_run        = 240
 num_prev_files      = 5
-n_lead_times        = 6
+n_lead_times        = 24
 n_members           = 2
 
 n_levels            = 8
@@ -56,7 +56,7 @@ extrap_method       = "semilagrangian"
 bandpass_filter = 'uniform' if (n_levels == 1) else 'gaussian'
 
 # Figure parameters
-animate             = True
+animate             = False
 nloops              = 2
 plot_leadtimes      = [0,2,5,11,23]
 
