@@ -23,12 +23,12 @@ domain = "mch_hdf5"
 timestep = 240
 
 # Experiment parameters
-n_levels        = [1,8]   # to produce the nowcast [1 or 8]
-n_levels_verif  = 8       # to verify the nowcast [keep it fixed]
-recompute_flow  = False   # whether to recompute the flow of the fct/obs fields (very slow)
-
-nhours_ar       = 2000    # max number of hours to integrate the full ACF
-min_rho_level0  = 0.95    # minimum auto-correlation of level 0 to consider as valid
+n_levels            = [1,8]   # to produce the nowcast [1 or 8]
+n_levels_verif      = 8       # to verify the nowcast [keep it fixed]
+recompute_flow      = False   # whether to recompute the flow of the fct/obs fields (very slow)
+remove_norain_step  = True    # whether to remove the rain/norain steps
+nhours_ar           = 2000    # max number of hours to integrate the full ACF
+min_rho_level0      = 0.95    # minimum auto-correlation of level 0 to consider as valid
 
 # Forecast parameters
 n_lead_times        = 12
@@ -41,7 +41,7 @@ pmatching_method    = "cdf"
 zero_value_dbr      = -15
 noise_stddev_adj    = None
 conditional_stats   = False
-seed                = None
+seed                = 24
 
 filename_out = "data/%s_ar2_corr_results_recomputeflow-%s.dat" % (domain,recompute_flow)
 if domain == "fmi":
@@ -107,8 +107,8 @@ for pei,pe in enumerate(precipevents):
                 break
         
         # get radar mask
-        mask = (~np.isnan(R[-1,:,:])).astype(float)
-        
+        mask = (~np.isnan(R[-1,:,:]))
+            
         # convert to mm/h
         R, metadata = utils.to_rainrate(R, metadata)
 
@@ -125,7 +125,8 @@ for pei,pe in enumerate(precipevents):
         R_ = R.copy()
             
         # Remove rain/no-rain discontinuity so that dBR field starts from 0
-        R = remove_rain_norain_discontinuity(R)
+        if remove_norain_step:
+            R = remove_rain_norain_discontinuity(R)
             
         # Read verifying observations
         obs_fns = io.archive.find_by_date(curdate, root_path, datasource["path_fmt"],
@@ -149,7 +150,8 @@ for pei,pe in enumerate(precipevents):
         R_obs_ = R_obs.copy()
         
         # Remove rain/no-rain discontinuity so that dBR field starts from 0
-        R_obs = remove_rain_norain_discontinuity(R_obs)
+        if remove_norain_step:
+            R_obs = remove_rain_norain_discontinuity(R_obs)
             
         ## Compute motion field
         if oflow_method == "darts":
@@ -171,8 +173,12 @@ for pei,pe in enumerate(precipevents):
             R_fct[R_fct < metadata["threshold"]] = metadata["zerovalue"]
             
             # Remove rain/no-rain discontinuity so that dBR field starts from 0
-            R_fct = remove_rain_norain_discontinuity(R_fct)
-            
+            if remove_norain_step:
+                R_fct = remove_rain_norain_discontinuity(R_fct)
+                outval_extr = 0
+            else:
+                outval_extr = zero_value_dbr
+                
             ## Derive AR-2 ACF from forecast sequences
             print('-------------------------------------')
             print("Computing ACF of nowcasts...")
@@ -193,8 +199,8 @@ for pei,pe in enumerate(precipevents):
                         UV = oflow(R_fct[m,lt:lt+2,:,:])
                     
                     # Put in Lagrangian coordinates the three forecast images
-                    R_minus_2 = extrapolation.semilagrangian.extrapolate(R_fct[m,lt, :, :], UV, 2, outval=zero_value_dbr)[-1, :, :]
-                    R_minus_1 = extrapolation.semilagrangian.extrapolate(R_fct[m,lt+1, :, :], UV, 1, outval=zero_value_dbr)[-1, :, :]
+                    R_minus_2 = extrapolation.semilagrangian.extrapolate(R_fct[m,lt, :, :], UV, 2, outval=outval_extr)[-1, :, :]
+                    R_minus_1 = extrapolation.semilagrangian.extrapolate(R_fct[m,lt+1, :, :], UV, 1, outval=outval_extr)[-1, :, :]
                     
                     # Cascade decomposition
                     c1 = cascade.decomposition.decomposition_fft(R_minus_2, filter_verif)
@@ -203,6 +209,11 @@ for pei,pe in enumerate(precipevents):
                     
                     # Compute autocorrelation coefficients and function at each level
                     for i in range(n_levels_verif):
+                        # normalize cascade levels
+                        c1["cascade_levels"][i, :, :] = (c1["cascade_levels"][i, :, :] - c1["means"][i])/c1["stds"][i]
+                        c2["cascade_levels"][i, :, :] = (c2["cascade_levels"][i, :, :] - c2["means"][i])/c2["stds"][i]
+                        c3["cascade_levels"][i, :, :] = (c3["cascade_levels"][i, :, :] - c3["means"][i])/c3["stds"][i]
+                        
                         gamma_1 = np.corrcoef(c3["cascade_levels"][i, :, :][mask==1].flatten(),
                                               c2["cascade_levels"][i, :, :][mask==1].flatten())[0, 1]
                         gamma_2 = np.corrcoef(c3["cascade_levels"][i, :, :][mask==1].flatten(),
@@ -217,6 +228,8 @@ for pei,pe in enumerate(precipevents):
                         
                         results[lev]["cc_fct"][i] += np.array(acf)
                         results[lev]["n_fct_samples"][i] += 1
+                        
+                        print("Level", i, "|", gamma_1, gamma_2)
             
             ## Derive AR-2 ACF from observed sequences (for each lead time)
             print("Computing ACF of observations at each lead time...")        
@@ -227,8 +240,8 @@ for pei,pe in enumerate(precipevents):
                     UV = oflow(R_obs_[lt:lt+2,:,:])
                 
                 # Put in Lagrangian coordinates the three observed images
-                R_minus_2 = extrapolation.semilagrangian.extrapolate(R_obs[lt, :, :], UV, 2, outval=zero_value_dbr)[-1, :, :]
-                R_minus_1 = extrapolation.semilagrangian.extrapolate(R_obs[lt+1, :, :], UV, 1, outval=zero_value_dbr)[-1, :, :]
+                R_minus_2 = extrapolation.semilagrangian.extrapolate(R_obs[lt, :, :], UV, 2, outval=outval_extr)[-1, :, :]
+                R_minus_1 = extrapolation.semilagrangian.extrapolate(R_obs[lt+1, :, :], UV, 1, outval=outval_extr)[-1, :, :]
                 
                 # Cascade decomposition
                 c1 = cascade.decomposition.decomposition_fft(R_minus_2, filter_verif)
@@ -237,6 +250,11 @@ for pei,pe in enumerate(precipevents):
                 
                 # Compute autocorrelation coefficients
                 for i in range(n_levels_verif):
+                    # normalize cascade levels
+                    c1["cascade_levels"][i, :, :] = (c1["cascade_levels"][i, :, :] - c1["means"][i])/c1["stds"][i]
+                    c2["cascade_levels"][i, :, :] = (c2["cascade_levels"][i, :, :] - c2["means"][i])/c2["stds"][i]
+                    c3["cascade_levels"][i, :, :] = (c3["cascade_levels"][i, :, :] - c3["means"][i])/c3["stds"][i]
+                    
                     gamma_1 = np.corrcoef(c3["cascade_levels"][i, :, :][mask==1].flatten(),
                                           c2["cascade_levels"][i, :, :][mask==1].flatten())[0, 1]
                     gamma_2 = np.corrcoef(c3["cascade_levels"][i, :, :][mask==1].flatten(),
@@ -251,13 +269,15 @@ for pei,pe in enumerate(precipevents):
                     
                     results[lev]["cc_obs"][i] += np.array(acf_obs)
                     results[lev]["n_obs_samples"][i] += 1
+                    
+                    print("Level", i, "|", gamma_1, gamma_2)
             
             ## Derive AR-2 ACF from observed sequence (only start time)
             print("Computing ACF of observations at start time...")
             
             # Put in Lagrangian coordinates the three observed images
-            R_minus_2 = extrapolation.semilagrangian.extrapolate(R[-3, :, :], UV, 2, outval=zero_value_dbr)[-1, :, :]
-            R_minus_1 = extrapolation.semilagrangian.extrapolate(R[-2, :, :], UV, 1, outval=zero_value_dbr)[-1, :, :]
+            R_minus_2 = extrapolation.semilagrangian.extrapolate(R[-3, :, :], UV, 2, outval=outval_extr)[-1, :, :]
+            R_minus_1 = extrapolation.semilagrangian.extrapolate(R[-2, :, :], UV, 1, outval=outval_extr)[-1, :, :]
             
             # Cascade decomposition
             c1 = cascade.decomposition.decomposition_fft(R_minus_2, filter_verif)
@@ -266,6 +286,11 @@ for pei,pe in enumerate(precipevents):
             
             # Compute autocorrelation coefficients
             for i in range(n_levels_verif):
+                # normalize cascade levels
+                c1["cascade_levels"][i, :, :] = (c1["cascade_levels"][i, :, :] - c1["means"][i])/c1["stds"][i]
+                c2["cascade_levels"][i, :, :] = (c2["cascade_levels"][i, :, :] - c2["means"][i])/c2["stds"][i]
+                c3["cascade_levels"][i, :, :] = (c3["cascade_levels"][i, :, :] - c3["means"][i])/c3["stds"][i]
+                
                 gamma_1 = np.corrcoef(c3["cascade_levels"][i, :, :][mask==1].flatten(),
                                       c2["cascade_levels"][i, :, :][mask==1].flatten())[0, 1]
                 gamma_2 = np.corrcoef(c3["cascade_levels"][i, :, :][mask==1].flatten(),
@@ -280,6 +305,8 @@ for pei,pe in enumerate(precipevents):
                 
                 results[lev]["cc_obs_t0"][i] += np.array(acf_obs)
                 results[lev]["n_obs_samples_t0"][i] += 1
+                
+                print("Level", i, "|", gamma_1, gamma_2)
                     
             print("Done.")
 
