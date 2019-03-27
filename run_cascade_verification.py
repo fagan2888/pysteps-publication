@@ -2,8 +2,8 @@
 
 """
 Cascade experiment:
-Pysteps ensembles are generated and verified with/without cascade decomposition and with/without precipitation mask.
-Verification results are saved in a binary file.
+Pysteps ensembles are generated and verified with/without cascade decomposition 
+and with/without precipitation mask. Verification results are saved in a binary file.
 """
 
 import dask
@@ -22,7 +22,6 @@ from pysteps.verification import ensscores, probscores
 from pysteps.utils import aggregate_fields_space, clip_domain
 
 # Data
-sys.path.insert(0,'..')
 import precipevents
 
 data_source = "mch_hdf5"

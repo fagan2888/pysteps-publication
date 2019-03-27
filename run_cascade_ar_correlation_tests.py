@@ -16,7 +16,6 @@ from pysteps.timeseries import autoregression, correlation
 from pysteps.utils import remove_rain_norain_discontinuity
 import matplotlib.pyplot as plt
 
-sys.path.insert(0,'..')
 import precipevents
 
 # the domain: "fmi" or "mch_hdf5"
