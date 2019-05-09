@@ -4,7 +4,7 @@ from matplotlib import pyplot
 from pysteps import motion, nowcasts
 from pysteps.postprocessing.ensemblestats import excprob
 from pysteps.utils import transformation
-from pysteps.visualization import plot_precip_field, quiver
+from pysteps.visualization import plot_precip_field
 
 # compute the advection field
 oflow_method = motion.get_method("lucaskanade")

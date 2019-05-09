@@ -5,14 +5,11 @@ from datetime import datetime
 from pysteps.io.archive import find_by_date
 from pysteps.io.importers import import_fmi_pgm, import_mch_gif
 from pysteps.io.readers import read_timeseries
-from pysteps.motion.darts import DARTS
 from pysteps.motion.lucaskanade import dense_lucaskanade
 from pysteps import nowcasts
 from pysteps.postprocessing.ensemblestats import excprob
 from pysteps.utils import conversion, transformation
-from pysteps.utils.dimension import square_domain
-from pysteps.visualization import plot_precip_field, quiver
-from pysteps.visualization.utils import parse_proj4_string
+from pysteps.visualization import plot_precip_field
 
 date = datetime.strptime("201609281600", "%Y%m%d%H%M")
 root_path = "/top/college/academic/ECE/spulkkin/home/ohjelmistokehitys/pySTEPS/pysteps-data/radar/fmi/20160928"
